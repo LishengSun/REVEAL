@@ -8,12 +8,20 @@ import math
 import matplotlib.pyplot as plt
 import copy
 import pdb
+from matplotlib.patches import Rectangle
+
 
 
 FixedCategorical = torch.distributions.Categorical
 
 CITYSCAPE = '/datasets01/cityscapes/112817/gtFine'
 IMG_ENVS = ['mnist', 'cifar10', 'cifar100', 'imagenet']
+
+
+def label(xy, text):
+    y = xy[1] + 2  # shift y-value for label so that it's below the artist
+    plt.text(xy[0]+2, y, text, ha="center", family='sans-serif', size=14)
+
 
 
 def get_data_loader(env_id, train=True):
@@ -89,20 +97,38 @@ class ImgEnv(object):
 
 		# identify patches to be revealed
 		self.all_target_patches = []
-		self.all_target_patches_percentage = []
+
+		# self.all_target_patches_percentage = []
+		self.all_target_patches_brightness = []
 		for row in range(self.num_row_choices):
 			for col in range(self.num_col_choices):
-				# pdb.set_trace()
-				# percent = (self.curr_img[0,self.window*row:self.window*(row+1),\
-					# self.window*col:self.window*(col+1)].numpy()>0).sum() / (self.window**2)
-				percent = self.curr_img[0,self.window*row:self.window*(row+1),\
+				brightness = self.curr_img[0,self.window*row:self.window*(row+1),\
 					self.window*col:self.window*(col+1)].numpy().mean()
+				
+				# fig,ax = plt.subplots()
+				# currentAxis = plt.gca()
+				# currentAxis.add_patch(Rectangle((self.window*row, self.window*col),env.window,env.window, alpha=0.2, facecolor="yellow"))
+				# label((self.window*row+4, self.window*col+4), 'b='+str(brightness))
+
+				# plt.imshow(env.curr_img[0,:,:])
+				# plt.show()
+				
 				self.all_target_patches.append(row*self.num_col_choices+col)
-				self.all_target_patches_percentage.append(percent)
-		self.all_target_patches, self.all_target_patches_percentage = (list(x) for x in \
-			zip(*sorted(zip(self.all_target_patches, self.all_target_patches_percentage), key=lambda pair: pair[1], reverse=True)))
-		# print (self.all_target_patches, self.all_target_patches_percentage)
-		self.target = self.all_target_patches[0]
+				self.all_target_patches_brightness.append(brightness)
+		self.all_target_patches, self.all_target_patches_brightness = (list(x) for x in \
+			zip(*sorted(zip(self.all_target_patches, self.all_target_patches_brightness), key=lambda pair: pair[1], reverse=True)))
+		print ('brightness', self.all_target_patches, self.all_target_patches_brightness)
+		fig,ax = plt.subplots()
+		currentAxis = plt.gca()
+		target_row = self.all_target_patches[0]  // self.num_row_choices
+		target_col = self.all_target_patches[0]  % self.num_row_choices
+		currentAxis.add_patch(Rectangle((self.window*target_row, self.window*target_col),env.window,env.window, alpha=0.2, facecolor="yellow"))
+		label((self.window*target_row+4, self.window*target_col+4), 'b='+str(self.all_target_patches_brightness[0]))
+		plt.title('target patch')
+		plt.imshow(env.curr_img[0,:,:])
+		plt.show()
+		# self.target = self.all_target_patches[0]
+		self.targets = self.all_target_patches[:3] # top 10 brightest
 		# print ('self.target', self.target)
 
 
@@ -119,12 +145,10 @@ class ImgEnv(object):
 
 	def step(self, action):
 		done = False
-		if action[0] <= self.num_row_choices * self.num_col_choices: # move
-				self.pos[0] = min(self.curr_img.shape[1], action[0] // self.num_col_choices * self.window)# row move
-				self.pos[1] = min(self.curr_img.shape[2], action[0] % self.num_col_choices * self.window)# col move
+		if action <= self.num_row_choices * self.num_col_choices: # move
+			self.pos[0] = min(self.curr_img.shape[1], action // self.num_row_choices * self.window)# row move
+			self.pos[1] = min(self.curr_img.shape[2], action % self.num_row_choices * self.window)# col move
 
-				# self.pred_pos[0] = min(self.curr_img.shape[1], self.window*(action[1] // self.num_col_choices))
-				# self.pred_pos[1] = min(self.curr_img.shape[2], self.window*(action[1] % self.num_col_choices))
 		else:
 			print("Action out of bounds!")
 			return
@@ -139,9 +163,20 @@ class ImgEnv(object):
 				
 		self.num_steps += 1
 
-		done = action[1]==self.target  or self.num_steps >= self.max_steps
-		reward = - 1. / self.max_steps
-		if done and action[1]==self.target:
+		# done = action[1]==self.target  or self.num_steps >= self.max_steps
+		action_row = action // self.num_row_choices
+		action_col = action % self.num_row_choices
+
+		action_brightness = self.curr_img[0,self.window*action_row:self.window*(action_row+1),\
+					self.window*action_col:self.window*(action_col+1)].numpy().mean()
+
+		max_brightness = self.all_target_patches_brightness[0]
+
+		done = action in self.targets
+		print ('cost step = %f, cost brightness = %f'%(-1 / self.max_steps, action_brightness / max_brightness))
+		reward = -1. / self.max_steps + action_brightness / max_brightness
+
+		if done:
 			reward = 1
 		return self.state, reward, done, {}
 
@@ -157,6 +192,12 @@ if __name__ == '__main__':
 
 	env = ImgEnv('mnist', train=True, max_steps=MAX_STEPS, channels=2, window=8, num_labels=10)
 	env.reset()
+
+	fig,ax = plt.subplots()
+	currentAxis = plt.gca()
+	currentAxis.add_patch(Rectangle((env.all_target_patches[0]//env.num_row_choices*env.window, env.all_target_patches[0]%env.num_row_choices*env.window),env.window,env.window, alpha=0.2, facecolor="red"))
+	label((env.all_target_patches[0]//env.num_row_choices*env.window+4, env.all_target_patches[0]%env.num_row_choices*env.window+4), 'b='+str(env.all_target_patches_brightness[0]))
+	plt.title('target patch')
 	plt.imshow(env.curr_img[0,:,:])
 	plt.show()
 	# fig = plt.figure()
@@ -166,14 +207,14 @@ if __name__ == '__main__':
 	for t in range(MAX_STEPS):
 	# while not done:
 		# action = [0, env.target]
-		action = [np.array(np.random.choice(range(16))), np.array(np.random.choice(range(16)))]
+		action = np.array(np.random.choice(range(16)))#, np.array(np.random.choice(range(16)))]
 		observation, reward, done, info = env.step(action)
 		agent_pos = env.pos
-		row_move = action[0] // env.num_col_choices
-		col_move = action[0] % env.num_col_choices
+		row_move = action // env.num_row_choices
+		col_move = action % env.num_row_choices
 		total_reward = reward + GAMMA*total_reward
 		plt.imshow(observation[1,:,:])
-		plt.title('a=%i,%i, target=%i, r=%f, total_r = %f'%(action[0], action[1],env.target, reward, total_reward))
+		plt.title('a=%i, target=%i, r=%f, total_r = %f'%(action, env.targets[0], reward, total_reward))
 		plt.show()
 
 		if done: 
