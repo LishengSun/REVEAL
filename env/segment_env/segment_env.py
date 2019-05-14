@@ -16,6 +16,13 @@ def generate_a_segment(length=50, noise=0.0, free_location=False):
   segment = np.array(segment) + noise * np.random.random(length)
   return segment, float(right)
 
+def optimal_reward(segment_length, reward_pred, exploration_loss):
+    state_value = np.zeros(segment_length + 1)
+    state_value[1] = reward_pred
+    for i in range(2, segment_length + 1):
+        exploration_value = [state_value[k]*k/i + (1-k/i)*state_value[i-k] - exploration_loss for k in range(1, i)]
+        state_value[i] = max(reward_pred/i, np.max(exploration_value))
+    return state_value
 
 class ImgEnv(object):
     def __init__(self, max_steps=1000, window=1, segment_length=50, noise=0.0, free_location=False,
