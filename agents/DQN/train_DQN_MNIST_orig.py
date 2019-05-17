@@ -11,7 +11,7 @@ from distributions import Categorical, DiagGaussian
 from collections import namedtuple, defaultdict
 
 from context import MNIST_env
-from MNIST_env import img_env
+from MNIST_env import img_env_orig
 
 import utils
 
@@ -78,7 +78,7 @@ class myNet(nn.Module):
 			action = dist.sample()
 
 		action_log_probs = dist.log_probs(action)
-		if self.dataset in img_env.IMG_ENVS:
+		if self.dataset in img_env_orig.IMG_ENVS:
 			clf = self.clf(self.actor_features)
 			clf_proba = clf.logits
 			if deterministic:
@@ -187,7 +187,7 @@ if __name__ == '__main__':
 	MODEL_DIR = './trained_model/'
 	RESULT_DIR = './results/'
 
-	env = img_env.ImgEnv('mnist', train=True, max_steps=NUM_STEPS, channels=2, window=WINDOW_SIZE, num_labels=NUM_LABELS)
+	env = img_env_orig.ImgEnv('mnist', train=True, max_steps=NUM_STEPS, channels=2, window=WINDOW_SIZE, num_labels=NUM_LABELS)
 	
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	
