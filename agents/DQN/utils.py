@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 from context import MNIST_env
-from MNIST_env.img_env import IMG_ENVS
+from MNIST_env.img_env_orig import IMG_ENVS
 
 
 # if gpu is to be used

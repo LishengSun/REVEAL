@@ -117,18 +117,17 @@ class ImgEnv(object):
 				self.all_target_patches_brightness.append(brightness)
 		self.all_target_patches, self.all_target_patches_brightness = (list(x) for x in \
 			zip(*sorted(zip(self.all_target_patches, self.all_target_patches_brightness), key=lambda pair: pair[1], reverse=True)))
-		print ('brightness', self.all_target_patches, self.all_target_patches_brightness)
-		fig,ax = plt.subplots()
-		currentAxis = plt.gca()
-		target_row = self.all_target_patches[0]  // self.num_row_choices
-		target_col = self.all_target_patches[0]  % self.num_row_choices
-		currentAxis.add_patch(Rectangle((self.window*target_row, self.window*target_col),env.window,env.window, alpha=0.2, facecolor="yellow"))
-		label((self.window*target_row+4, self.window*target_col+4), 'b='+str(self.all_target_patches_brightness[0]))
-		plt.title('target patch')
-		plt.imshow(env.curr_img[0,:,:])
-		plt.show()
-		# self.target = self.all_target_patches[0]
-		self.targets = self.all_target_patches[:3] # top 10 brightest
+		# print ('brightness', self.all_target_patches, self.all_target_patches_brightness)
+		# fig,ax = plt.subplots()
+		# currentAxis = plt.gca()
+		# target_row = self.all_target_patches[0]  // self.num_row_choices
+		# target_col = self.all_target_patches[0]  % self.num_row_choices
+		# currentAxis.add_patch(Rectangle((self.window*target_row, self.window*target_col),self.window,self.window, alpha=0.2, facecolor="yellow"))
+		# label((self.window*target_row+4, self.window*target_col+4), 'b='+str(self.all_target_patches_brightness[0]))
+		# plt.title('target patch')
+		# plt.imshow(env.curr_img[0,:,:])
+		# plt.show()
+		self.targets = self.all_target_patches[:6] # top 6 brightest
 		# print ('self.target', self.target)
 
 
@@ -173,8 +172,9 @@ class ImgEnv(object):
 		max_brightness = self.all_target_patches_brightness[0]
 
 		done = action in self.targets
-		print ('cost step = %f, cost brightness = %f'%(-1 / self.max_steps, action_brightness / max_brightness))
-		reward = -1. / self.max_steps + action_brightness / max_brightness
+		# print ('cost step = %f, cost brightness = %f'%(-0.5 / self.max_steps, 0.5*action_brightness/max_brightness/self.max_steps))
+		# reward = -1. / self.max_steps
+		reward = 0.5*(-1. / self.max_steps + (action_brightness/max_brightness) / self.max_steps)
 
 		if done:
 			reward = 1
@@ -187,27 +187,52 @@ class ImgEnv(object):
 		pass
 
 if __name__ == '__main__':
-	MAX_STEPS = 16
+	MAX_STEPS = 49
 	GAMMA = 1 - (1 / MAX_STEPS) # Set to horizon of max episode length
 
-	env = ImgEnv('mnist', train=True, max_steps=MAX_STEPS, channels=2, window=8, num_labels=10)
+	env = ImgEnv('mnist', train=True, max_steps=MAX_STEPS, channels=2, window=5, num_labels=10)
 	env.reset()
 
-	fig,ax = plt.subplots()
-	currentAxis = plt.gca()
-	currentAxis.add_patch(Rectangle((env.all_target_patches[0]//env.num_row_choices*env.window, env.all_target_patches[0]%env.num_row_choices*env.window),env.window,env.window, alpha=0.2, facecolor="red"))
-	label((env.all_target_patches[0]//env.num_row_choices*env.window+4, env.all_target_patches[0]%env.num_row_choices*env.window+4), 'b='+str(env.all_target_patches_brightness[0]))
-	plt.title('target patch')
-	plt.imshow(env.curr_img[0,:,:])
-	plt.show()
+	# fig,ax = plt.subplots()
+	# currentAxis = plt.gca()
+	# currentAxis.add_patch(Rectangle((env.all_target_patches[0]//env.num_row_choices*env.window, env.all_target_patches[0]%env.num_row_choices*env.window),env.window,env.window, alpha=0.2, facecolor="red"))
+	# label((env.all_target_patches[0]//env.num_row_choices*env.window+4, env.all_target_patches[0]%env.num_row_choices*env.window+4), 'b='+str(env.all_target_patches_brightness[0]))
+	# plt.title('target patch')
+	# plt.imshow(env.curr_img[0,:,:])
+	# plt.show()
 	# fig = plt.figure()
+	fig,ax = plt.subplots()
+
+	currentAxis = plt.gca()
+	currentAxis.add_patch(Rectangle((env.targets[0]%env.num_col_choices*env.window, env.targets[0]//env.num_col_choices*env.window),env.window,env.window, alpha=0.5, facecolor="red"))
+	label((env.targets[0]%env.num_row_choices*env.window-0.5, env.targets[0]//env.num_row_choices*env.window-0.5), 't0')
+
+	currentAxis.add_patch(Rectangle((env.targets[1]%env.num_row_choices*env.window, env.targets[1]//env.num_row_choices*env.window),env.window,env.window, alpha=0.5, facecolor="red"))
+	label((env.targets[1]%env.num_row_choices*env.window-0.5, env.targets[1]//env.num_row_choices*env.window-0.5), 't1')
+	
+	currentAxis.add_patch(Rectangle((env.targets[2]%env.num_row_choices*env.window, env.targets[2]//env.num_row_choices*env.window),env.window,env.window, alpha=0.5, facecolor="red"))
+	label((env.targets[2]%env.num_row_choices*env.window-0.5, env.targets[2]//env.num_row_choices*env.window-0.5), 't2')
+
+	currentAxis.add_patch(Rectangle((env.targets[3]%env.num_row_choices*env.window, env.targets[3]//env.num_row_choices*env.window),env.window,env.window, alpha=0.5, facecolor="red"))
+	label((env.targets[3]%env.num_row_choices*env.window-0.5, env.targets[3]//env.num_row_choices*env.window-0.5), 't3')
+
+	currentAxis.add_patch(Rectangle((env.targets[4]%env.num_row_choices*env.window, env.targets[4]//env.num_row_choices*env.window),env.window,env.window, alpha=0.5, facecolor="red"))
+	label((env.targets[4]%env.num_row_choices*env.window-0.5, env.targets[4]//env.num_row_choices*env.window-0.5), 't4')
+
+	currentAxis.add_patch(Rectangle((env.targets[5]%env.num_row_choices*env.window, env.targets[5]//env.num_row_choices*env.window),env.window,env.window, alpha=0.5, facecolor="red"))
+	label((env.targets[5]%env.num_row_choices*env.window-0.5, env.targets[5]//env.num_row_choices*env.window-0.5), 't5')
+
+	plt.imshow(env.curr_img[0,:,:])
+	plt.savefig('img_env_rank_ex')
+	plt.show()
+
 	
 	done = False
 	total_reward = 0
 	for t in range(MAX_STEPS):
 	# while not done:
 		# action = [0, env.target]
-		action = np.array(np.random.choice(range(16)))#, np.array(np.random.choice(range(16)))]
+		action = np.array(np.random.choice(range(49)))#, np.array(np.random.choice(range(16)))]
 		observation, reward, done, info = env.step(action)
 		agent_pos = env.pos
 		row_move = action // env.num_row_choices
