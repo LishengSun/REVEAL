@@ -7,6 +7,7 @@ from utils import init, init_normc_
 from resnet import resnet18
 from context import MNIST_env
 from MNIST_env.img_env_orig import IMG_ENVS
+import pdb
 
 
 class Flatten(nn.Module):
