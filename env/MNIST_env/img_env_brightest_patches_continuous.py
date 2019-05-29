@@ -31,7 +31,6 @@ def get_data_loader(env_id, train=True):
 		[T.ToTensor(),
 		 T.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))])
 	if env_id in IMG_ENVS:
-		# print (env_id)
 		if env_id == 'mnist':
 			transform = T.Compose([
 						   T.Resize(size=(32, 32)),
@@ -68,7 +67,6 @@ def get_data_loader(env_id, train=True):
 
 class ImgEnv(object):
 	def __init__(self, dataset, train, max_steps, channels, window=5, num_labels=10):
-		# Jump action space has 28/window*28/window+1 actions: 
 
 		self.channels = channels
 		self.data_loader = get_data_loader(dataset, train=train)
@@ -97,43 +95,24 @@ class ImgEnv(object):
 		# identify patches to be revealed
 		self.all_target_patches = []
 
-		# self.all_target_patches_percentage = []
 		self.all_target_patches_brightness = []
 		for row in range(self.num_row_choices):
 			for col in range(self.num_col_choices):
 				brightness = self.curr_img[0,self.window*row:self.window*(row+1),\
 					self.window*col:self.window*(col+1)].numpy().mean()
 				
-				# fig,ax = plt.subplots()
-				# currentAxis = plt.gca()
-				# currentAxis.add_patch(Rectangle((self.window*row, self.window*col),env.window,env.window, alpha=0.2, facecolor="yellow"))
-				# label((self.window*row+4, self.window*col+4), 'b='+str(brightness))
-
-				# plt.imshow(env.curr_img[0,:,:])
-				# plt.show()
 				
 				self.all_target_patches.append(row*self.num_col_choices+col)
 				self.all_target_patches_brightness.append(brightness)
 		self.all_target_patches, self.all_target_patches_brightness = (list(x) for x in \
 			zip(*sorted(zip(self.all_target_patches, self.all_target_patches_brightness), key=lambda pair: pair[1], reverse=True)))
-		# print ('brightness', self.all_target_patches, self.all_target_patches_brightness)
-		# fig,ax = plt.subplots()
-		# currentAxis = plt.gca()
-		# target_row = self.all_target_patches[0]  // self.num_row_choices
-		# target_col = self.all_target_patches[0]  % self.num_row_choices
-		# currentAxis.add_patch(Rectangle((self.window*target_row, self.window*target_col),self.window,self.window, alpha=0.2, facecolor="yellow"))
-		# label((self.window*target_row+4, self.window*target_col+4), 'b='+str(self.all_target_patches_brightness[0]))
-		# plt.title('target patch')
-		# plt.imshow(env.curr_img[0,:,:])
-		# plt.show()
+		
 		self.targets = self.all_target_patches[:6] # top 6 brightest
-		# print ('self.target', self.target)
 
 
 		# non-initialize position at center of image, agent can decide the first position
 		# self.pos = [max(0, self.curr_img.shape[1]//2-self.window), max(0, self.curr_img.shape[2]//2-self.window)]
 		self.pos = [np.nan, np.nan]
-		self.pred_pos = [np.nan, np.nan]
 		self.state = -np.ones(
 			(self.channels, self.curr_img.shape[1], self.curr_img.shape[2]))
 
@@ -160,12 +139,9 @@ class ImgEnv(object):
 		self.state[1:,
 			(self.pos_patch[0]*self.window):((self.pos_patch[0]+1)*self.window), (self.pos_patch[1]*self.window):((self.pos_patch[1]+1)*self.window)] = \
 				self.curr_img[:, (self.pos_patch[0]*self.window):(self.pos_patch[0]+1)*self.window, (self.pos_patch[1]*self.window):(self.pos_patch[1]+1)*self.window]
-		# self.state[1:,
-			# self.pred_pos[0]:self.pred_pos[0]+self.window, self.pred_pos[1]:self.pred_pos[1]+self.window] = 20
-				
+		
 		self.num_steps += 1
 
-		# done = action[1]==self.target  or self.num_steps >= self.max_steps
 		action_row = int(action[0] // self.window)
 		action_col = int(action[1] // self.window)
 
