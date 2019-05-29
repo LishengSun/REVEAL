@@ -80,7 +80,7 @@ class Policy(nn.Module):
             raise NotImplementedError
 
         if action_space.__class__.__name__ == "Box":
-            num_outputs = 1 # one value in range[0, 32*32] then will be parsed to (row, col)
+            num_outputs = 1 
 
             self.action_head = TwoDGaussian(self.base.output_size, num_outputs)
             self.value_head = nn.Linear(self.base.output_size, num_outputs)
