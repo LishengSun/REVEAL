@@ -100,13 +100,13 @@ class Policy(nn.Module):
         x, _ = self.base(inputs, states, masks)
         action_prob = self.action_head(x)
         state_values = self.value_head(x)
-        # pdb.set_trace()
+        # print ('state_value: ', state_values)
 
         return action_prob, state_values
 
 
 policy = Policy(env.observation_space.shape, env.action_space, dataset='mnist')
-optimizer = optim.Adam(policy.parameters(), lr=1e-3)
+optimizer = optim.Adam(policy.parameters(), lr=3e-2)
 eps = np.finfo(np.float32).eps.item()
 
 
@@ -119,7 +119,6 @@ def select_action(state, env):
                     states=state, masks=state[1])
     action = action_prob.sample()
     action = torch.clamp(action, env.action_space.low[0], env.action_space.high[0])
-
 
     # print ('action before', action)
     
@@ -139,13 +138,15 @@ def finish_episode():
     value_losses = []
     returns = []
     for r in policy.rewards[::-1]:
-        R = r + args.gamma * R
+        R = r + GAMMA * R
         returns.insert(0, R)
         # if R == 1:
+        # print ('R', R)
     returns = torch.tensor(returns)
     if returns.shape[0] > 1:
         returns = (returns - returns.mean()) / (returns.std() + eps)
     for (log_prob, value), R in zip(saved_actions, returns):
+        # print ('(log_prob, value), R', (log_prob, value), R)
         advantage = R - value.item()
         policy_losses.append(-log_prob * advantage)
         value_losses.append(F.smooth_l1_loss(value, torch.tensor([R])))
@@ -156,8 +157,12 @@ def finish_episode():
     loss.backward()
     optimizer.step()
     # print ('========optimized===========')
+    # print ('policy.rewards', np.min(policy.rewards), np.max(policy.rewards))
     del policy.rewards[:]
     del policy.saved_actions[:]
+    p_l = [p.detach().item() for p in policy_losses]
+    v_l = [v.detach().item() for v in value_losses]
+    return p_l, v_l, loss.detach().item()
 
 
 
@@ -169,6 +174,9 @@ if __name__ == '__main__':
     episode_len = []
     episode_1st_action_Col = []
     episode_1st_action_Row = [] 
+    episode_policy_losses = []
+    episode_value_losses = []
+    episode_tot_loss = []
     for i_episode in range(NUM_EPISODES):#count(1):
         # print ('episode %i'%i_episode)
         state, ep_reward = env.reset(), 0
@@ -185,12 +193,15 @@ if __name__ == '__main__':
                 break
 
         running_reward = 0.05 * ep_reward + (1 - 0.05) * running_reward
-        finish_episode()
+        policy_losses, value_losses, tot_loss = finish_episode()
         if i_episode % args.log_interval == 0:
             print('Episode {}\tLast reward: {:.2f}\tAverage reward: {:.2f}'.format(
                   i_episode, ep_reward, running_reward))
         episode_R.append(ep_reward)
         episode_len.append(t+1)
+        episode_policy_losses.append(np.mean(policy_losses))
+        episode_value_losses.append(np.mean(value_losses))
+        episode_tot_loss.append(tot_loss)
         
 
         if i_episode % args.test_interval == 0:
@@ -260,28 +271,35 @@ if __name__ == '__main__':
             #             break
 
 
-    plt.subplot(411)
+    plt.subplot(511)
     plt.xlabel('Episode')
     plt.ylabel('Reward')
     plt.plot(smoothing_average(episode_R))
 
-    plt.subplot(412)
+    plt.subplot(512)
     plt.xlabel('Episode')
-    plt.ylabel('Episode length')
+    plt.ylabel('Epi len')
     plt.plot(smoothing_average(episode_len))
 
 
-    plt.subplot(413)
+    plt.subplot(513)
     plt.xlabel('Episode')
-    plt.ylabel('1st Action Row')
+    plt.ylabel('1st Row')
     plt.plot(smoothing_average(episode_1st_action_Row))
+    # plt.ylabel('policy_losses')
+    # plt.plot(smoothing_average(episode_policy_losses))
 
-    plt.subplot(414)
+    plt.subplot(514)
     plt.xlabel('Episode')
-    plt.ylabel('1st Action Col')
+    plt.ylabel('1st Col')
     plt.plot(smoothing_average(episode_1st_action_Col))
-    plt.savefig(os.path.join(RESULT_DIR, 'AC_MNIST_brightest_patches_continuous_%ie'%(i_episode+1)))
-
+    # plt.ylabel('value_losses')
+    # plt.plot(smoothing_average(episode_value_losses))
+    # plt.savefig(os.path.join(RESULT_DIR, 'AC_MNIST_brightest_patches_continuous_%ie'%(i_episode+1)))
+    plt.subplot(515)
+    plt.xlabel('Episode')
+    plt.ylabel('tot loss')
+    plt.plot(smoothing_average(episode_tot_loss))
     plt.show()
 
         # if running_reward > env.spec.reward_threshold:
