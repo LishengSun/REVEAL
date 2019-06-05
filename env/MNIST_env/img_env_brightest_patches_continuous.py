@@ -10,6 +10,9 @@ import copy
 import pdb
 from matplotlib.patches import Rectangle
 import random
+import matplotlib.animation as animation
+
+
 
 
 
@@ -19,9 +22,9 @@ CITYSCAPE = '/datasets01/cityscapes/112817/gtFine'
 IMG_ENVS = ['mnist', 'cifar10', 'cifar100', 'imagenet']
 
 
-def label(xy, text):
-    y = xy[1] + 2  # shift y-value for label so that it's below the artist
-    plt.text(xy[0]+2, y, text, ha="center", family='sans-serif', size=14)
+def label(axis, xy, text):
+	y = xy[1] + 2  # shift y-value for label so that it's below the artist
+	axis.text(xy[0]+2, y, text, ha="center", family='sans-serif', size=14)
 
 
 
@@ -66,6 +69,7 @@ def get_data_loader(env_id, train=True):
 
 
 class ImgEnv(object):
+	metadata = {'render.modes': ['human', 'rgb_array']}
 	def __init__(self, dataset, train, max_steps, channels, window=5, num_labels=10):
 
 		self.channels = channels
@@ -78,7 +82,6 @@ class ImgEnv(object):
 		self.num_col_choices = math.ceil(32/self.window)
 		self.observation_space = Box(low=0, high=1, shape=(channels, 32, 32))#shape=(channels, 32, 32))
 		self.action_space = Box(np.array([0,0]), np.array([31,31]))  # x, y, both in range(0, 32)
-
 
 	def seed(self, seed):
 		np.random.seed(seed)
@@ -124,8 +127,8 @@ class ImgEnv(object):
 	def step(self, action):
 		done = False
 		if action[0] < self.observation_space.shape[1] and action[1]< self.observation_space.shape[2]: # move
-			self.pos[0] = action[0] # row
-			self.pos[1] = action[1] # col 
+			self.pos[0] = action[0] # col
+			self.pos[1] = action[1] # row
 			self.pos_patch = [int(self.pos[0] // self.window), \
 			int(self.pos[1] // self.window)]
 
@@ -161,6 +164,29 @@ class ImgEnv(object):
 		return self.state, reward, done, {}
 
 
+	def render(self):
+		# inspired by https://github.com/siavashk/gym-mnist-pair/blob/master/gym_mnist_pair/envs/mnist_pair.py
+		
+		fig, axarr = plt.subplots(1,1)
+		axarr.clear()
+		axarr.imshow(self.curr_img[0,:,:], extent=[0, 32, 32, 0]) # extent = [left, right, bottom, top]
+		
+		for i, t in enumerate(self.targets):
+			
+			axarr.add_patch(Rectangle((t%self.num_col_choices*self.window, t//self.num_col_choices*self.window),self.window,self.window, alpha=0.5, facecolor="red"))
+			label(axarr, (t%self.num_row_choices*self.window, t//self.num_row_choices*self.window), 't'+str(i))
+
+
+		axarr.imshow(self.state[1, :, :], extent=[0, 32, 32, 0], alpha=0.6)
+		plt.draw()
+		plt.pause(1)
+		plt.close('all')
+
+		return axarr
+
+
+
+
 
 if __name__ == '__main__':
 	MAX_STEPS = 49
@@ -169,49 +195,26 @@ if __name__ == '__main__':
 	env = ImgEnv('mnist', train=True, max_steps=MAX_STEPS, channels=2, window=5, num_labels=10)
 	env.reset()
 
-	fig,ax = plt.subplots()
-
-	currentAxis = plt.gca()
-	currentAxis.add_patch(Rectangle((env.targets[0]%env.num_col_choices*env.window, env.targets[0]//env.num_col_choices*env.window),env.window,env.window, alpha=0.5, facecolor="red"))
-	label((env.targets[0]%env.num_row_choices*env.window-0.5, env.targets[0]//env.num_row_choices*env.window-0.5), 't0')
-
-	currentAxis.add_patch(Rectangle((env.targets[1]%env.num_row_choices*env.window, env.targets[1]//env.num_row_choices*env.window),env.window,env.window, alpha=0.5, facecolor="red"))
-	label((env.targets[1]%env.num_row_choices*env.window-0.5, env.targets[1]//env.num_row_choices*env.window-0.5), 't1')
-	
-	currentAxis.add_patch(Rectangle((env.targets[2]%env.num_row_choices*env.window, env.targets[2]//env.num_row_choices*env.window),env.window,env.window, alpha=0.5, facecolor="red"))
-	label((env.targets[2]%env.num_row_choices*env.window-0.5, env.targets[2]//env.num_row_choices*env.window-0.5), 't2')
-
-	currentAxis.add_patch(Rectangle((env.targets[3]%env.num_row_choices*env.window, env.targets[3]//env.num_row_choices*env.window),env.window,env.window, alpha=0.5, facecolor="red"))
-	label((env.targets[3]%env.num_row_choices*env.window-0.5, env.targets[3]//env.num_row_choices*env.window-0.5), 't3')
-
-	currentAxis.add_patch(Rectangle((env.targets[4]%env.num_row_choices*env.window, env.targets[4]//env.num_row_choices*env.window),env.window,env.window, alpha=0.5, facecolor="red"))
-	label((env.targets[4]%env.num_row_choices*env.window-0.5, env.targets[4]//env.num_row_choices*env.window-0.5), 't4')
-
-	currentAxis.add_patch(Rectangle((env.targets[5]%env.num_row_choices*env.window, env.targets[5]//env.num_row_choices*env.window),env.window,env.window, alpha=0.5, facecolor="red"))
-	label((env.targets[5]%env.num_row_choices*env.window-0.5, env.targets[5]//env.num_row_choices*env.window-0.5), 't5')
-
-	plt.imshow(env.curr_img[0,:,:])
-	plt.savefig('img_env_rank_ex')
-	plt.show()
-
 	
 	done = False
 	total_reward = 0
+	fig_ani = plt.figure(num='test')
 	for t in range(MAX_STEPS):
-	# while not done:
-		# action = [0, env.target]
+	
 		action = [random.uniform(0, 32), random.uniform(0, 32)]
+		
 		observation, reward, done, info = env.step(action)
+		axarr = env.render()
 		agent_pos = env.pos
 		row_move = action[0] // env.window
 		col_move = action[1] % env.window
 		total_reward = reward + GAMMA*total_reward
-		plt.imshow(observation[1,:,:])
-		plt.title('a=(%f,%f), a_pat=%i, r=%f, total_r = %f'%(action[0], action[1], env.action_patch, reward, total_reward))
-		plt.show()
 
 		if done: 
+			print ('done after %i steps'%t)
 			break
+
+
 
 
 
