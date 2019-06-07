@@ -35,6 +35,9 @@ FixedNormal.entropy = lambda self: entropy(self).sum(-1)
 FixedNormal.mode = lambda self: self.mean
 
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
 class Categorical(nn.Module):
     def __init__(self, num_inputs, num_outputs):
         super(Categorical, self).__init__()
@@ -91,10 +94,11 @@ class TwoDGaussian(nn.Module):
 
     def forward(self, x):
         action_mean = torch.cat((self.mean1(x)[0], self.mean2(x)[0]))
+        action_mean = action_mean.to(device)
         # pdb.set_trace()
         action_std = torch.eye(2)
-
         action_std[0,0] = torch.clamp(self.std1(x), min= 1e-5)
         action_std[1,1] = torch.clamp(self.std2(x), min= 1e-5)
+        action_std = action_std.to(device)
         return FixedMultivariateNormal(action_mean, action_std)
         
