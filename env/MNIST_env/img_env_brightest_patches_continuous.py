@@ -1,5 +1,5 @@
 import numpy as np
-
+import os
 import torch
 from gym.spaces import Discrete, Box
 import torchvision.transforms as T
@@ -156,33 +156,60 @@ class ImgEnv(object):
 		self.action_patch = self.pos_patch[0]*self.num_col_choices + self.pos_patch[1]
 		done = self.action_patch in self.targets
 		# print ('cost step = %f, cost brightness = %f'%(-0.5 / self.max_steps, 0.5*action_brightness/max_brightness/self.max_steps))
-		# reward = -1. / self.max_steps
-		reward = 0.5*(-1. / self.max_steps + (action_brightness/max_brightness) / self.max_steps)
+		reward = -1. / self.max_steps
+		# reward = 0.5*(-1. / self.max_steps + (action_brightness/max_brightness) / self.max_steps)
 
 		if done:
 			reward = 1
 		return self.state, reward, done, {}
 
 
-	def render(self):
+	def render(self, step_i, temp_dir = './temp/', done=False, save=False, show_action_prob=False, action_prob=None, action=None):
 		# inspired by https://github.com/siavashk/gym-mnist-pair/blob/master/gym_mnist_pair/envs/mnist_pair.py
+		if not os.path.exists(temp_dir):
+			os.makedirs(temp_dir, exist_ok=True)
+
+		axarr1 = plt.subplot(311)
 		
-		fig, axarr = plt.subplots(1,1)
-		axarr.clear()
-		axarr.imshow(self.curr_img[0,:,:], extent=[0, 32, 32, 0]) # extent = [left, right, bottom, top]
-		
+		axarr1.imshow(self.state[1, :, :], extent=[0, 32, 32, 0], vmin=0, vmax=1)
+		label(axarr1, (np.clip(action[1].item(), 0, 31), np.clip(action[0].item(), 0, 31)), 'A')
+
+		if done: 
+			axarr1.text(16, 16, 'Done!', size=20, ha='center')
+			for i, t in enumerate(self.targets):
+				axarr1.add_patch(Rectangle((t%self.num_col_choices*self.window, t//self.num_col_choices*self.window),self.window,self.window, alpha=0.5, facecolor="red"))
+				label(axarr1, (t%self.num_row_choices*self.window, t//self.num_row_choices*self.window), 't'+str(i))
+
+			
+		axarr2 = plt.subplot(312)
+		axarr2.imshow(self.curr_img[0,:,:], extent=[0, 32, 32, 0], vmin=0, vmax=1)
 		for i, t in enumerate(self.targets):
 			
-			axarr.add_patch(Rectangle((t%self.num_col_choices*self.window, t//self.num_col_choices*self.window),self.window,self.window, alpha=0.5, facecolor="red"))
-			label(axarr, (t%self.num_row_choices*self.window, t//self.num_row_choices*self.window), 't'+str(i))
+			axarr2.add_patch(Rectangle((t%self.num_col_choices*self.window, t//self.num_col_choices*self.window),self.window,self.window, alpha=0.5, facecolor="red"))
+			label(axarr2, (t%self.num_row_choices*self.window, t//self.num_row_choices*self.window), 't'+str(i))
+
+		plt.axis('off')	
+		if show_action_prob:
+			axarr3 = plt.subplot(313)
+			if action_prob.__class__.__name__ != 'MultivariateNormal':
+				print ('Action prob of type %s not valid'%action_prob.__class__.__name__)
+				return
+			else:
+				action_mean = action_prob.loc.detach().cpu().numpy()
+				action_cov = action_prob.covariance_matrix.detach().cpu().numpy()
+				x, y = np.random.multivariate_normal(action_mean*31, action_cov, 5000).T
+				axarr3.plot(x, y, 'x')
+				# label(axarr3, (15, 15), str(action_mean*31))
+				# label(axarr3, (10, 10), 'A'+str(action))
 
 
-		axarr.imshow(self.state[1, :, :], extent=[0, 32, 32, 0], alpha=0.6)
+		if save: plt.savefig(os.path.join(temp_dir, 'frame%i'%step_i))
+		
+		# print ('temp%i'%step_i)
 		plt.draw()
-		plt.pause(1)
+		plt.pause(0.1)
 		plt.close('all')
 
-		return axarr
 
 
 
@@ -191,20 +218,22 @@ class ImgEnv(object):
 if __name__ == '__main__':
 	MAX_STEPS = 49
 	GAMMA = 1 - (1 / MAX_STEPS) # Set to horizon of max episode length
-
+	temp_dir = './temp/'
+	
 	env = ImgEnv('mnist', train=True, max_steps=MAX_STEPS, channels=2, window=5, num_labels=10)
 	env.reset()
 
 	
 	done = False
 	total_reward = 0
-	fig_ani = plt.figure(num='test')
+	
 	for t in range(MAX_STEPS):
+		print ('t', t)
 	
 		action = [random.uniform(0, 32), random.uniform(0, 32)]
 		
 		observation, reward, done, info = env.step(action)
-		axarr = env.render()
+		env.render(t)
 		agent_pos = env.pos
 		row_move = action[0] // env.window
 		col_move = action[1] % env.window
@@ -215,8 +244,19 @@ if __name__ == '__main__':
 			break
 
 
+	# ani = animation.ArtistAnimation(fig_ani, ani_frames, repeat=False, interval=500)#, interval=50000, blit=True)
+	# ani.save('test.mp4')
 
+	fig_ani = plt.figure(num='test')
+	ani_frames = []
+	for frame_i in range(t+1):
+		frame = plt.imread('temp/temp%i.png'%frame_i)
+		frame = plt.imshow(frame)
+		plt.axis('off')
 
+		ani_frames.append([frame])
+	ani = animation.ArtistAnimation(fig_ani, ani_frames, repeat=False, interval=500)
+	ani.save('test.mp4')
 
 
 
