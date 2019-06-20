@@ -87,18 +87,23 @@ class TwoDGaussian(nn.Module):
               lambda x: nn.init.constant_(x, 0))
 
         self.mean1 = init_(nn.Linear(num_inputs, num_outputs))
-        self.std1 = init_(nn.Linear(num_inputs, num_outputs))
+        self.log_std1 = init_(nn.Linear(num_inputs, num_outputs))
+        self.sigmoid1 = nn.Sigmoid()
         self.mean2 = init_(nn.Linear(num_inputs, num_outputs))
-        self.std2 = init_(nn.Linear(num_inputs, num_outputs))
+        self.log_std2 = init_(nn.Linear(num_inputs, num_outputs))
+        self.sigmoid2 = nn.Sigmoid()
         
-
     def forward(self, x):
-        action_mean = torch.cat((self.mean1(x)[0], self.mean2(x)[0]))
+        
+        action_mean = torch.cat((self.sigmoid1(self.mean1(x))[0], (self.sigmoid2(self.mean2(x))[0])))
         action_mean = action_mean.to(device)
-        # pdb.set_trace()
         action_std = torch.eye(2)
-        action_std[0,0] = torch.clamp(self.std1(x), min= 1e-5)
-        action_std[1,1] = torch.clamp(self.std2(x), min= 1e-5)
+        log_std1 = torch.clamp(self.log_std1(x), -20, 2)
+        log_std2 = torch.clamp(self.log_std2(x), -20, 2)
+        
+        action_std[0,0] = log_std1.exp()
+        action_std[1,1] = log_std2.exp()
+    
         action_std = action_std.to(device)
         return FixedMultivariateNormal(action_mean, action_std)
         
