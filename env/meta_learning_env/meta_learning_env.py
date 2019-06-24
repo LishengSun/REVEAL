@@ -32,7 +32,6 @@ class OBOEEnv(object):
         self.use_metafeatures = use_meta_features
 
         # these attributes are here to make plotting easier
-
         self.to_draw = np.zeros((self.max_steps + 1, 1, self.segment_length, 3)).astype(int)
         self.action_history = []
 
@@ -52,26 +51,29 @@ class OBOEEnv(object):
         if NEXT:
             number, line = self.generate_a_segment()
 
-        self.line = number
+        self.line_number = number
         self.state = np.zeros((2, self.segment_length))
+
         if self.use_metafeatures:
-            self.state[1, :self.metafeatures.shape[1]] = self.metafeatures.loc[self.line]
+            self.state[1, :self.metafeatures.shape[1]] = self.metafeatures.loc[self.line_number]
             self.state[0, :self.metafeatures.shape[1]] = np.ones(self.metafeatures.shape[1])
         return self.state
 
     def step(self, action):
         """
-
+        Compute 1 step of the game.
+        :param action: int in range(self.time_matrix.shape[1])
+        :return: array new_state, float reward, bool done
         """
         if self.pos is None:
-            reward = -self.time_cost * self.time_matrix.iloc[self.line, action] + 1 - self.loss_matrix.iloc[
-                self.line, action]
+            reward = -self.time_cost * self.time_matrix.iloc[self.line_number, action] + 1 - self.loss_matrix.iloc[
+                self.line_number, action]
         else:
-            reward = -self.time_cost * self.time_matrix.iloc[self.line, action] + max(0, np.min(
-                self.state[1][self.state[0] == 1] - self.loss_matrix.iloc[self.line, action]))
+            reward = -self.time_cost * self.time_matrix.iloc[self.line_number, action] + max(0, np.min(
+                self.state[1][self.state[0] == 1] - self.loss_matrix.iloc[self.line_number, action]))
         self.pos = action
 
-        self.state[1, self.pos] = self.loss_matrix.iloc[self.line, self.pos]
+        self.state[1, self.pos] = self.loss_matrix.iloc[self.line_number, self.pos] + self.noise*np.random.normal()
         self.state[0, self.pos] = 1.
 
         self.action_history.append(action)
@@ -105,7 +107,7 @@ class OBOEEnv(object):
         """
         At the end of the trajectory, plots the performance-time graph.
         """
-        line = self.line
+        line = self.line_number
         error = self.loss_matrix.iloc[line, self.action_history]
         time = self.time_matrix.iloc[line, self.action_history]
         algo = self.loss_matrix.columns[self.action_history]
@@ -146,7 +148,7 @@ class OBOEEnv(object):
     def get_frame(self, t):
         segment_plot = np.zeros((1, self.segment_length, 3)).astype(int)
         segment_plot[:, self.state[0] == 0, :] = segment_plot[:, self.state[0] == 0, :] + 128
-        segment_plot[:, self.state[0] == 1, 0] = (self.loss_matrix.iloc[self.line, self.state[0] == 1] * 255).astype(
+        segment_plot[:, self.state[0] == 1, 0] = (self.loss_matrix.iloc[self.line_number, self.state[0] == 1] * 255).astype(
             int)
         if self.pos is not None:
             segment_plot[:, self.pos, :] = np.clip(segment_plot[:, self.pos, :] + 170, 0, 255)
@@ -155,7 +157,7 @@ class OBOEEnv(object):
 
     def draw(self, e):
         true_image = np.zeros((1, self.segment_length, 3)).astype(int)
-        true_image[:, :, 0] = (self.loss_matrix.iloc[self.line, :] * 255).astype(int)
+        true_image[:, :, 0] = (self.loss_matrix.iloc[self.line_number, :] * 255).astype(int)
 
         array_list = [
             np.vstack([s_plot, true_image]) for s_plot in self.to_draw[:self.num_steps]
