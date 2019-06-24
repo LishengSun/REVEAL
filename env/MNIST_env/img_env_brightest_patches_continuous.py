@@ -120,28 +120,36 @@ class ImgEnv(object):
 			(self.channels, self.curr_img.shape[1], self.curr_img.shape[2]))
 
 		self.num_steps = 0
+		self.action_history = []
+		self.pos_patch_history = []
 		
 		return self.state
 
 
 	def step(self, action):
 		done = False
+		self.action_history.append(action)
 		if action[0] < self.observation_space.shape[1] and action[1]< self.observation_space.shape[2]: # move
 			self.pos[0] = action[0] # col
 			self.pos[1] = action[1] # row
-			self.pos_patch = [int(self.pos[0] // self.window), \
-			int(self.pos[1] // self.window)]
+			self.curr_pos_patch = [int(self.pos[0] // self.window), \
+				int(self.pos[1] // self.window)]
+			if self.pos_patch_history == []:
+				self.pos_patch_history = [self.curr_pos_patch]
+			else:
+				self.pos_patch_history.append(self.curr_pos_patch)
 
 		else:
 			print("Action out of bounds!")
 			return
 		self.state[0, :, :] = np.zeros(
 			(1, self.curr_img.shape[1], self.curr_img.shape[2]))
-		self.state[0, (self.pos_patch[0]*self.window):((self.pos_patch[0]+1)*self.window), (self.pos_patch[1]*self.window):((self.pos_patch[1]+1)*self.window)] = 1
+		for pos_patch in self.pos_patch_history:
+			self.state[0, (pos_patch[0]*self.window):((pos_patch[0]+1)*self.window), (pos_patch[1]*self.window):((pos_patch[1]+1)*self.window)] = 1
 		# pdb.set_trace()
 		self.state[1:,
-			(self.pos_patch[0]*self.window):((self.pos_patch[0]+1)*self.window), (self.pos_patch[1]*self.window):((self.pos_patch[1]+1)*self.window)] = \
-				self.curr_img[:, (self.pos_patch[0]*self.window):(self.pos_patch[0]+1)*self.window, (self.pos_patch[1]*self.window):(self.pos_patch[1]+1)*self.window]
+			(self.curr_pos_patch[0]*self.window):((self.curr_pos_patch[0]+1)*self.window), (self.curr_pos_patch[1]*self.window):((self.curr_pos_patch[1]+1)*self.window)] = \
+				self.curr_img[:, (self.curr_pos_patch[0]*self.window):(self.curr_pos_patch[0]+1)*self.window, (self.curr_pos_patch[1]*self.window):(self.curr_pos_patch[1]+1)*self.window]
 		
 		self.num_steps += 1
 
@@ -153,7 +161,7 @@ class ImgEnv(object):
 
 		max_brightness = self.all_target_patches_brightness[0]
 
-		self.action_patch = self.pos_patch[0]*self.num_col_choices + self.pos_patch[1]
+		self.action_patch = self.curr_pos_patch[0]*self.num_col_choices + self.curr_pos_patch[1]
 		done = self.action_patch in self.targets
 		# print ('cost step = %f, cost brightness = %f'%(-0.5 / self.max_steps, 0.5*action_brightness/max_brightness/self.max_steps))
 		reward = -1. / self.max_steps
@@ -169,36 +177,37 @@ class ImgEnv(object):
 		if not os.path.exists(temp_dir):
 			os.makedirs(temp_dir, exist_ok=True)
 
-		axarr1 = plt.subplot(311)
-		
-		axarr1.imshow(self.state[1, :, :], extent=[0, 32, 32, 0], vmin=0, vmax=1)
+		axarr1 = plt.subplot(411)
+		axarr1.imshow(self.state[0, :, :], extent=[0, 32, 32, 0], vmin=0, vmax=1)
 		label(axarr1, (np.clip(action[1].item(), 0, 31), np.clip(action[0].item(), 0, 31)), 'A')
-
+		
 		if done: 
 			axarr1.text(16, 16, 'Done!', size=20, ha='center')
 			for i, t in enumerate(self.targets):
 				axarr1.add_patch(Rectangle((t%self.num_col_choices*self.window, t//self.num_col_choices*self.window),self.window,self.window, alpha=0.5, facecolor="red"))
 				label(axarr1, (t%self.num_row_choices*self.window, t//self.num_row_choices*self.window), 't'+str(i))
+		axarr2 = plt.subplot(412)
+		axarr2.imshow(self.state[0, :, :], extent=[0, 32, 32, 0], vmin=0, vmax=1) #alpha=0.6, 
+		
 
 			
-		axarr2 = plt.subplot(312)
-		axarr2.imshow(self.curr_img[0,:,:], extent=[0, 32, 32, 0], vmin=0, vmax=1)
+		axarr3 = plt.subplot(413)
+		axarr3.imshow(self.curr_img[0,:,:], extent=[0, 32, 32, 0], vmin=0, vmax=1)
 		for i, t in enumerate(self.targets):
-			
-			axarr2.add_patch(Rectangle((t%self.num_col_choices*self.window, t//self.num_col_choices*self.window),self.window,self.window, alpha=0.5, facecolor="red"))
-			label(axarr2, (t%self.num_row_choices*self.window, t//self.num_row_choices*self.window), 't'+str(i))
+			axarr3.add_patch(Rectangle((t%self.num_col_choices*self.window, t//self.num_col_choices*self.window),self.window,self.window, alpha=0.5, facecolor="red"))
+			label(axarr3, (t%self.num_row_choices*self.window, t//self.num_row_choices*self.window), 't'+str(i))
 
 		plt.axis('off')	
 		if show_action_prob:
-			axarr3 = plt.subplot(313)
+			axarr4 = plt.subplot(414)
 			if action_prob.__class__.__name__ != 'MultivariateNormal':
 				print ('Action prob of type %s not valid'%action_prob.__class__.__name__)
 				return
 			else:
 				action_mean = action_prob.loc.detach().cpu().numpy()
 				action_cov = action_prob.covariance_matrix.detach().cpu().numpy()
-				x, y = np.random.multivariate_normal(action_mean*31, action_cov, 5000).T
-				axarr3.plot(x, y, 'x')
+				x, y = np.random.multivariate_normal(action_mean, action_cov, 5000).T
+				axarr4.plot(x, y, 'x')
 				# label(axarr3, (15, 15), str(action_mean*31))
 				# label(axarr3, (10, 10), 'A'+str(action))
 
@@ -207,7 +216,7 @@ class ImgEnv(object):
 		
 		# print ('temp%i'%step_i)
 		plt.draw()
-		plt.pause(0.1)
+		plt.pause(1)
 		plt.close('all')
 
 
@@ -233,7 +242,11 @@ if __name__ == '__main__':
 		action = [random.uniform(0, 32), random.uniform(0, 32)]
 		
 		observation, reward, done, info = env.step(action)
-		env.render(t)
+		# env.render(t)
+		plt.imshow(observation[0,:,:])
+
+		plt.show()
+
 		agent_pos = env.pos
 		row_move = action[0] // env.window
 		col_move = action[1] % env.window

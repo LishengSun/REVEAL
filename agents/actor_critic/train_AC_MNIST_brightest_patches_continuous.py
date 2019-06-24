@@ -95,7 +95,8 @@ class Policy(nn.Module):
 		action_prob, state_value = self.act(inputs=torch.from_numpy(state).float().resize_(1, 2, 32, 32).to(device), \
 			states=state, masks=state[1])
 		action = action_prob.sample()
-		action = torch.clamp(action, 1e-5, 1) # action will be in (0, 1]
+		action = torch.clamp(action, 0 , 31)
+		# action = torch.clamp(action, 1e-5, 1) # action will be in (0, 1]
 		self.saved_actions.append(SavedAction(action, action_prob.log_prob(action), state_value, action_prob.entropy()))
 		return action, action_prob
 
@@ -154,7 +155,7 @@ def test_AC_MNIST_brightest_patches_continuous(policy_net, env, num_epi, test_nu
 		for t_test in range(MAX_STEPS):
 			
 			action_test, action_prob_test = policy.select_action(state_test) # action_test in (0,1]
-			action_test = action_test * env_test.action_space.high[0] # scale action
+			# action_test = action_test * env_test.action_space.high[0] # scale action
 			state_test, reward_test, done_test, _ = env_test.step(action_test)
 			if test < 2: # only keep 10 test videos
 				env_test.render(t_test, os.path.join(RESULT_DIR_TEST, 'temp_test%i/epi%i'%(test,num_epi)), \
@@ -170,7 +171,7 @@ def test_AC_MNIST_brightest_patches_continuous(policy_net, env, num_epi, test_nu
 		if test<2:
 			fig_ani = plt.figure(num='test_%i'%test)
 			ani_frames = []
-			for frame_i in range(1, t_test+1):
+			for frame_i in range(0, t_test+1):
 				frame = plt.imread(os.path.join(RESULT_DIR_TEST, 'temp_test%i/epi%i/frame%i.png'%(test, num_epi, frame_i)))
 				plt.axis('off')
 				ani_frames.append(frame)
@@ -227,7 +228,7 @@ if __name__ == '__main__':
 			state, ep_reward = env.reset(), 0
 			for t in range(MAX_STEPS):  # No infinite loop while learning
 				action, action_prob = policy.select_action(state) # action between 0 and 1, becase of action_prob
-				action = action * env.action_space.high[0] # scale the action to adapt the env size
+				# action = action * env.action_space.high[0] # scale the action to adapt the env size
 				if t == 0:
 					episode_1st_action_Col.append(action[0].item())
 					episode_1st_action_Row.append(action[1].item())
@@ -255,10 +256,13 @@ if __name__ == '__main__':
 			if i_episode == 0 or (i_episode+1) % args.test_interval == 0:
 				torch.save(policy.state_dict(), os.path.join(MODEL_DIR,'model_AC_MNIST_brightest_patches_continuous_%ir_%ie.pth'%(run,i_episode)))
 				if run == 0: # test only 1 run
-					env_test = img_env_brightest_patches_continuous.ImgEnv('mnist', train=False, max_steps=MAX_STEPS, channels=2, window=WINDOW, num_labels=NUM_LABELS)
-					test_len, test_R = test_AC_MNIST_brightest_patches_continuous(policy, env_test, i_episode, TEST_NUM)
-					episodes_len_test.append(test_len)
-					episodes_R_test.append(test_R)
+					try: 
+						env_test = img_env_brightest_patches_continuous.ImgEnv('mnist', train=False, max_steps=MAX_STEPS, channels=2, window=WINDOW, num_labels=NUM_LABELS)
+						test_len, test_R = test_AC_MNIST_brightest_patches_continuous(policy, env_test, i_episode, TEST_NUM)
+						episodes_len_test.append(test_len)
+						episodes_R_test.append(test_R)
+					except Exception:
+						pass
 
 		run_len.append(episode_len)
 		run_R.append(episode_R)
