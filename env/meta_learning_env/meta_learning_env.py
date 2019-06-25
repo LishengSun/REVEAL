@@ -6,7 +6,7 @@ import pandas as pd
 import seaborn as sns
 
 
-class OBOEEnv(object):
+class metalEnv(object):
     def __init__(self, loss_matrix=pd.read_csv("/content/drive/My Drive/CEPchallenge/big_matrices/error_matrix.txt"),
                  time_matrix=pd.read_csv("/content/drive/My Drive/CEPchallenge/big_matrices/runtime_matrix.txt"),
                  metafeatures=pd.read_csv("/content/drive/My Drive/CEPchallenge/big_matrices/meta_features.txt"),
@@ -33,7 +33,6 @@ class OBOEEnv(object):
 
         # these attributes are here to make plotting easier
         self.to_draw = np.zeros((self.max_steps + 1, 1, self.segment_length, 3)).astype(int)
-        self.action_history = []
 
     def seed(self, seed):
         np.random.seed(seed)
