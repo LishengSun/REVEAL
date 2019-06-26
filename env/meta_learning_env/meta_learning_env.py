@@ -9,36 +9,49 @@ import seaborn as sns
 class metalEnv(object):
     def __init__(self, loss_matrix=pd.read_csv("env/meta_learning_env/meta_learning_matrices/error_BER_withoutNa.csv"),
                  time_matrix=pd.read_csv("env/meta_learning_env/meta_learning_matrices/Time_withoutNa.csv"),
-                 metafeatures=pd.read_csv("env/meta_learning_env/meta_learning_matrices/Meta_features_withoutNa.csv"),
-                 compression=None, noise=0.0, time_cost=0.1, max_steps=20, use_meta_features=False):
+                 metafeatures_matrix=pd.read_csv("env/meta_learning_env/meta_learning_matrices/Meta_features_withoutNa.csv"),
+                 compression=None, noise=0.0, time_cost=0.1, max_steps=20, use_meta_features=False, train=True):
         self.compression = compression
         self.noise = noise
-        time_matrix = time_matrix.iloc[:, 1:] # keep only real data
-        self.loss_matrix = loss_matrix
 
-        if use_meta_features:
-            metafeatures.iloc[:, 1:] = (metafeatures.iloc[:, 1:] -
-                                        metafeatures.iloc[:, 1:].mean()) / metafeatures.iloc[:, 1:].std()
-            self.loss_matrix = self.loss_matrix.merge(metafeatures, on="dataset")
+        self.nb_models = time_matrix.shape[1] - 1
+        self.nb_metafeatures = metafeatures_matrix.shape[1] - 1
+        self.segment_length = self.nb_models
 
-        self.loss_matrix = self.loss_matrix.iloc[:, 1:]  # keep only real data
-        self.max_steps = max_steps
-        self.segment_length = self.loss_matrix.shape[1]
-        self.nb_models = time_matrix.shape[1]
-        self.nb_metafeatures = self.segment_length - self.nb_models
-        self.time_cost = time_cost
+        self.time_matrix = time_matrix.iloc[:, 1:] # keep only real data
+
+        # meta features
         self.use_metafeatures = use_meta_features
+        if use_meta_features:
+            metafeatures_matrix.iloc[:, 1:] = (metafeatures_matrix.iloc[:, 1:] -
+                                        metafeatures_matrix.iloc[:, 1:].mean()) / metafeatures_matrix.iloc[:, 1:].std()
+            loss_matrix = loss_matrix.merge(metafeatures_matrix, on="dataset")
+            self.metafeatures_matrix = loss_matrix.iloc[:, (self.nb_models + 1):]
+            self.segment_length += self.nb_metafeatures
+
+        # keep only real data
+        self.loss_matrix = loss_matrix.iloc[:, 1:(self.nb_models+1)]
+
+        self.max_steps = max_steps
+        self.time_cost = time_cost
 
         # these attributes are here to make plotting easier
         self.to_draw = np.zeros((self.max_steps + 1, 1, self.segment_length, 3)).astype(int)
+        self.train = train
 
     def seed(self, seed):
         np.random.seed(seed)
 
     def generate_a_segment(self):
+        if self.train:
+            line = random.randint(0, int(0.7*self.loss_matrix.shape[0]))
+        else:
+            line = random.randint(int(0.7*self.loss_matrix.shape[0])+1, self.loss_matrix.shape[0]-1)
         noise = self.noise
-        line = random.randint(0, self.loss_matrix.shape[0] - 1)
-        return line, self.loss_matrix.loc[line] + noise * np.random.random(self.segment_length)
+        segment = self.loss_matrix.loc[line]
+        if self.use_metafeatures:
+            segment = np.concatenate((segment, self.metafeatures_matrix.loc[line]))
+        return line, segment + noise * np.random.random(self.segment_length)
 
     def reset(self, NEXT=True):
         self.pos = None
@@ -47,13 +60,13 @@ class metalEnv(object):
         self.action_history = []
         if NEXT:
             number, line = self.generate_a_segment()
+            self.line_number = number
 
-        self.line_number = number
         self.state = np.zeros((2, self.segment_length))
 
         if self.use_metafeatures:
-            self.state[1, :self.metafeatures.shape[1]] = self.metafeatures.loc[self.line_number]
-            self.state[0, :self.metafeatures.shape[1]] = np.ones(self.metafeatures.shape[1])
+            self.state[1, -self.nb_metafeatures:] = self.metafeatures_matrix.loc[self.line_number]
+            self.state[0, -self.nb_metafeatures:] = np.ones(self.nb_metafeatures)
         return self.state
 
     def step(self, action):
