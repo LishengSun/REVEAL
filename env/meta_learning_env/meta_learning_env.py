@@ -98,7 +98,8 @@ class metalEnv(object):
     def close(self):
         pass
 
-    # The following functions have to do with plotting performance through time
+    # The following functions have to do with plotting performance through time. At the end of a trajectory, simply
+    # call plot_time_perf
     def _better_than_random_baseline(self, line):
         """
         compute a simple greedy baseline that tries alogrithms from the fastest to the slowest

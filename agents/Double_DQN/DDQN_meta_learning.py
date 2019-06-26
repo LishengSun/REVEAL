@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 
 from agent_abstract import Agent
-from replay memory import ReplayMemory, Transition
+from replay_memory import ReplayMemory, Transition
 
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if use_cuda else "cpu")
@@ -124,11 +124,11 @@ class DDQN_separated_net(Agent):
         except:
             pass
 
-    def load_model(self, model=value_network_full_segment, state_length=self.segment_length, action_length=160, model_path='model.pickle', local=True):
+    def load_model(self, model=value_network_full_segment, action_length=160, model_path='model.pickle', local=True):
         if local:
             # self.model = big_navigation_model()
             # self.target_model = big_navigation_model()
-            self.model = model(state_length=state_length, action_length=action_length)
+            self.model = model(state_length=self.segment_length, action_length=action_length)
             self.target_model = model(segment_length=self.segment_length)
             hard_update(self.target_model, self.model)
         else:
