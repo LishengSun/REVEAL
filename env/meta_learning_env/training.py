@@ -9,9 +9,9 @@ def train(agent, env, epochs, epsilons, postfix='', draw=False, next_after_e=Tru
           path_result="/content/drive/My Drive/oboe_RL/"):
     """
     Training function for the RL agent
-    :param agent: (agent class) the RL agent.
+    :param agent: (agent class) the RL agent. Careful : the agent should load a model (agent.load_model(*args)) before training it.
     :param env: (metalEnv class) the environment.
-    :param epochs: (list of int) epochs where the epsilon should be decreased
+    :param epochs: (list of int) epochs where the epsilon should be decreased.
     :param epsilons:list of float) epsilon values.
     :param postfix: (string)
     :param draw: (bool)

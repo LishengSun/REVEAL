@@ -12,12 +12,12 @@ GAMMA = 0.99
 
 # Q value network
 class value_network_full_segment(nn.Module):
-  def __init__(self, segment_length):
+  def __init__(self, state_length, action_length):
     super(value_network_full_segment, self).__init__()
     self.conv1 = nn.Conv1d(2, 1, kernel_size=1, padding=0)
-    self.linear1 = nn.Linear(220, 60)
+    self.linear1 = nn.Linear(state_length, 60)
     self.linear2 = nn.Linear(60, 60)
-    self.linear3 = nn.Linear(60, 220)
+    self.linear3 = nn.Linear(60, action_length)
   def forward(self, x):
     x = F.relu(self.conv1(x))
     #print(x.shape)
@@ -124,11 +124,11 @@ class DDQN_separated_net(Agent):
         except:
             pass
 
-    def load_model(self, model=value_network_full_segment, model_path='model.pickle', local=True):
+    def load_model(self, model=value_network_full_segment, state_length=self.segment_length, action_length=160, model_path='model.pickle', local=True):
         if local:
             # self.model = big_navigation_model()
             # self.target_model = big_navigation_model()
-            self.model = model(segment_length=self.segment_length)
+            self.model = model(state_length=state_length, action_length=action_length)
             self.target_model = model(segment_length=self.segment_length)
             hard_update(self.target_model, self.model)
         else:
