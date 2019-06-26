@@ -7,27 +7,25 @@ import seaborn as sns
 
 
 class metalEnv(object):
-    def __init__(self, loss_matrix=pd.read_csv("/content/drive/My Drive/CEPchallenge/big_matrices/error_matrix.txt"),
-                 time_matrix=pd.read_csv("/content/drive/My Drive/CEPchallenge/big_matrices/runtime_matrix.txt"),
-                 metafeatures=pd.read_csv("/content/drive/My Drive/CEPchallenge/big_matrices/meta_features.txt"),
+    def __init__(self, loss_matrix=pd.read_csv("env/meta_learning_env/meta_learning_matrices/error_BER_withoutNa.csv"),
+                 time_matrix=pd.read_csv("env/meta_learning_env/meta_learning_matrices/Time_withoutNa.csv"),
+                 metafeatures=pd.read_csv("env/meta_learning_env/meta_learning_matrices/Meta_features_withoutNa.csv"),
                  compression=None, noise=0.0, time_cost=0.1, max_steps=20, use_meta_features=False):
         self.compression = compression
         self.noise = noise
-        self.time_matrix = time_matrix.iloc[:, 2:] # keep only real data
+        time_matrix = time_matrix.iloc[:, 1:] # keep only real data
         self.loss_matrix = loss_matrix
 
         if use_meta_features:
-            metafeatures.iloc[:, 2:] = (metafeatures.iloc[:, 2:] -
-                                        metafeatures.iloc[:, 2:].mean()) / metafeatures.iloc[:, 2:].std()
-            self.metafeatures = metafeatures
-            self.loss_matrix = self.loss_matrix.merge(self.metafeatures, on="dataset")
+            metafeatures.iloc[:, 1:] = (metafeatures.iloc[:, 1:] -
+                                        metafeatures.iloc[:, 1:].mean()) / metafeatures.iloc[:, 1:].std()
+            self.loss_matrix = self.loss_matrix.merge(metafeatures, on="dataset")
 
-        self.loss_matrix = self.loss_matrix.iloc[:, 2:]  # keep only real data
+        self.loss_matrix = self.loss_matrix.iloc[:, 1:]  # keep only real data
         self.max_steps = max_steps
-        if use_meta_features:
-            self.segment_length = self.loss_matrix.shape[1] + self.metafeatures.shape[1]
-        else:
-            self.segment_length = self.loss_matrix.shape[1]
+        self.segment_length = self.loss_matrix.shape[1]
+        self.nb_models = time_matrix.shape[1]
+        self.nb_metafeatures = self.segment_length - self.nb_models
         self.time_cost = time_cost
         self.use_metafeatures = use_meta_features
 
