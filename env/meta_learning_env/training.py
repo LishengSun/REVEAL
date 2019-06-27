@@ -1,11 +1,12 @@
 import numpy as np
 import pickle
 import torch
+import torch.nn.functional as F
 
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def train(agent, env, epochs, epsilons, postfix='', draw=False, next_after_e=True, save_result=True,
+def train(agent, env, epochs, epsilons=None, postfix='', draw=False, next_after_e=True, save_result=True,
           path_result="/content/drive/My Drive/oboe_RL/"):
     """
     Training function for the RL agent
@@ -154,3 +155,7 @@ def test(agent, env, epoch, postfix='', draw=False, path_result='/content/', sav
         with open(path_result + "rewards_test_{}.pickle".format(postfix), 'wb') as handle:
             pickle.dump(reward_list, handle)
     return lines_list, action_histories
+
+
+
+

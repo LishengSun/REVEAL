@@ -1,4 +1,4 @@
-from agent_abstract import Agent
+from agent_abstract import Agent_segment
 from replay memory import ReplayMemory, Transition
 from model_segment import navigation_model
 from oracle_segment import oracle
@@ -15,7 +15,7 @@ def hard_update(target, source):
     for target_param, param in zip(target.parameters(), source.parameters()):
         target_param.data.copy_(param.data)
 
-class DDQN_separated_net(Agent):
+class DDQN_separated_net(Agent_segment):
     def __init__(self, epsilon=0.3, memory_size=300, batch_size=16, model=navigation_model,
                  target_update_interval=1,
                  tau=0.005):
