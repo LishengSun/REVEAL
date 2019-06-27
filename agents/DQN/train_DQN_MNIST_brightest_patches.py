@@ -2,14 +2,14 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
-import torchvision
+# import torchvision
 import json
 import pdb
 import copy
 import optparse
 
 import random
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 from distributions import Categorical, DiagGaussian
 from collections import namedtuple
@@ -68,18 +68,18 @@ def smoothing_average(x, factor=500):
 
 
 
-def value_image_from_Q_values(Q_values, window_size):
+def value_image_from_Q_values(Q, window_size):
 	value_image = np.zeros((32,32))-999
 	i = 0
 	for row in range(32 // window_size + 1):
 		for col in range(32 // window_size + 1):
 			value_image[window_size*row:window_size*(row+1), \
-			window_size*col:window_size*(col+1)] = Q_values[0,i]
+			window_size*col:window_size*(col+1)] = Q[0,i]
 			i+= 1
 	return value_image
 
 
-def soft_update(target_net, source_net, tau=0.001):
+def soft_update(target_net, source_net, tau=0.1):
 	# Adapt from https://github.com/LishengSun/REVEAL/blob/master/agents/Double_DQN/Double_DQN.py
     for target_param, param in zip(target_net.parameters(), source_net.parameters()):
         target_param.data.copy_(target_param.data * (1.0 - tau) + param.data * tau)
@@ -125,7 +125,11 @@ class myNet(nn.Module):
 		if deterministic:
 			action = dist.mode()
 		else:
-			action = dist.sample()
+			try:
+				action = dist.sample()
+				# print ('no bug action', action)
+			except Exception:
+				pdb.set_trace()
 
 		action_log_probs = dist.log_probs(action)
 
@@ -194,6 +198,7 @@ def optimize_myNet(net, optimizer, BATCH_SIZE=128):
 	_, next_Q_values_batch, _, _= target_net.act(\
 		inputs=non_final_next_states.float(),\
 		states=non_final_next_states, masks=non_final_next_states[1])
+	# print ('from target net: next_Q_values_batch', next_Q_values_batch)
 
 	net_next_action, _, _, _= net.act(\
 		inputs=non_final_next_states.float(),\
@@ -292,6 +297,8 @@ if __name__ == '__main__':
 						help='render the environment')
 	parser.add_argument('--log_interval', type=int, default=100, metavar='N',
 						help='interval between training status logs (default: 100)')
+	parser.add_argument('--test', action='store_true',
+						help='Whether to run test')
 	parser.add_argument('--test_interval', type=int, default=500, metavar='T',
 						help='interval between testing')
 
@@ -316,9 +323,9 @@ if __name__ == '__main__':
 	MODEL_DIR = './trained_model/'
 	RESULT_DIR = './results/'
 	RESULT_DIR_TEST = './results/test_time'
-	RENDER = False
+	RENDER = args.render
 
-	TEST = True
+	TEST = args.test
 	TEST_NUM = 1000
 	TEST_INTERVAL = args.test_interval
 
@@ -370,10 +377,13 @@ if __name__ == '__main__':
 					action = np.array([np.random.choice(range(env.action_space.n))])
 				observation, reward, done, info = env.step(action[0])
 				if RENDER and i_episode % 50 == 0:
-					Qvalue_image = value_image_from_Q_values(dist.probs.detach().cpu(), env.window)
-
+					# Qvalue_image = value_image_from_Q_values(dist.probs.detach().cpu(), env.window)
+					Qvalue_image = value_image_from_Q_values(Q_values.detach().cpu(), env.window)
+					action_target, Q_values_target, dist_target, states_target = target_net.act(inputs=torch.from_numpy(observation).float().resize_(1, 2, 32, 32).to(device), \
+						states=observation, masks=observation[1])
+					target_Qvalue_image = value_image_from_Q_values(Q_values_target.detach().cpu(), env.window)
 					env.render(t+1, os.path.join(RESULT_DIR, 'temp_train/epi%i'%(i_episode)), \
-						done=done, save=True, show_value_image=True, value_image=Qvalue_image)
+						done=done, save=True, show_value_image=True, value_image=Qvalue_image, value_image_target=target_Qvalue_image)
 
 				total_reward_i = reward + GAMMA*total_reward_i
 				if not done:
@@ -386,13 +396,13 @@ if __name__ == '__main__':
 					# print ('next_state', next_state)
 					memory.push(torch.from_numpy(current_state), torch.from_numpy(action), \
 					next_state, torch.tensor([reward]).float())
-				
 				loss_i = optimize_myNet(net, optimizer, BATCH_SIZE)
-
+				
 				if done:
 					# print ('Done after %i steps, reward = %f'%(t+1, total_reward_i))
 					break
-			print ('run %i, episode %i, After %i steps, reward = %f, Done=%s'%(run, i_episode, t+1, total_reward_i,str(done)))
+			if loss_i == None: loss_i=-9999
+			print ('run %i, e %i, After %i steps, reward = %f, loss=%f'%(run, i_episode, t+1, total_reward_i,loss_i))
 			
 				# Update the target network, copying all weights and biases in DQN
 			if i_episode % TARGET_UPDATE == 0:
@@ -407,11 +417,11 @@ if __name__ == '__main__':
 			episode_durations.append(t+1)
 			q_values.append(Q_values)
 
-			# if (i_episode+1) % q_distribution_checkpoints == 0:
-			# 	plt.plot(Q_values.cpu().detach().numpy()[0], c=q_colors[(i_episode+1)//q_distribution_checkpoints-1], label='episode %i'%i_episode)
-			# 	plt.title('Q value distributions')
-			# 	plt.legend()
-			# 	plt.savefig(os.path.join(RESULT_DIR,'Q_MNIST_brightest_patches_{NUM_LABELS}labs_{RUNS}runs_{NUM_EPISODES}epis_{NUM_STEPS}steps_{WINDOW_SIZE}ws'.format(**locals())))
+			if (i_episode+1) % q_distribution_checkpoints == 0:
+				plt.plot(Q_values.cpu().detach().numpy()[0], c=q_colors[(i_episode+1)//q_distribution_checkpoints-1], label='episode %i'%i_episode)
+				plt.title('Q value distributions')
+				plt.legend()
+				plt.savefig(os.path.join(RESULT_DIR,'Q_MNIST_brightest_patches_{NUM_LABELS}labs_{RUNS}runs_{NUM_EPISODES}epis_{NUM_STEPS}steps_{WINDOW_SIZE}ws'.format(**locals())))
 
 
 

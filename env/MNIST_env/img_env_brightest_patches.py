@@ -82,7 +82,7 @@ class ImgEnv(object):
 		self.action_space = Discrete(self.num_row_choices*self.num_col_choices) # done detected automatically
 		self.observation_space = Box(low=0, high=1, shape=(channels, 32, 32))#shape=(channels, 32, 32))
 		self.num_targets = num_targets
-
+		self.max_brightness_so_far = 0
 
 	def seed(self, seed):
 		np.random.seed(seed)
@@ -159,12 +159,14 @@ class ImgEnv(object):
 		action_brightness = self.curr_img[0,self.window*action_row:self.window*(action_row+1),\
 					self.window*action_col:self.window*(action_col+1)].numpy().mean()
 
-		max_brightness = self.all_target_patches_brightness[0]
+		if action_brightness > self.max_brightness_so_far:
+			self.max_brightness_so_far = action_brightness
+		# max_brightness = self.all_target_patches_brightness[0]
 
 		done = action in self.targets
 		# print ('cost step = %f, cost brightness = %f'%(-0.5 / self.max_steps, 0.5*action_brightness/max_brightness/self.max_steps))
-		reward = -1. / self.max_steps
-		# reward = 0.5*(-1. / self.max_steps + (action_brightness/max_brightness) / self.max_steps)
+		# reward = -1. / self.max_steps
+		reward = 0.5*(-1. / self.max_steps + (action_brightness/self.max_brightness_so_far) / self.max_steps)
 
 		if done:
 			reward = 1
@@ -177,7 +179,7 @@ class ImgEnv(object):
 		pass
 
 
-	def render(self, step_i, temp_dir = './temp/', done=False, save=False, show_value_image=False, value_image=None):
+	def render(self, step_i, temp_dir = './temp/', done=False, save=False, show_value_image=False, value_image=None, value_image_target=None):
 		# inspired by https://github.com/siavashk/gym-mnist-pair/blob/master/gym_mnist_pair/envs/mnist_pair.py
 		
 		if not os.path.exists(temp_dir):
@@ -185,9 +187,9 @@ class ImgEnv(object):
 
 
 
-		axarr1 = plt.subplot(411)
+		axarr1 = plt.subplot(511)
 		axarr1.imshow(self.state[1, :, :], extent=[0, 32, 32, 0], vmin=0, vmax=1) #alpha=0.6, 
-		axarr2 = plt.subplot(412)
+		axarr2 = plt.subplot(512)
 		axarr2.imshow(self.state[0, :, :], extent=[0, 32, 32, 0], vmin=0, vmax=1) #alpha=0.6, 
 		# label(axarr2, (self.curr_pos[1], self.curr_pos[0]), step_i)
 
@@ -200,7 +202,7 @@ class ImgEnv(object):
 				axarr1.add_patch(Rectangle((t%self.num_col_choices*self.window, t//self.num_col_choices*self.window),self.window,self.window, alpha=0.5, facecolor="red"))
 				label(axarr1, (t%self.num_row_choices*self.window, t//self.num_row_choices*self.window), 't'+str(i))
 
-		axarr3 = plt.subplot(413)
+		axarr3 = plt.subplot(513)
 		axarr3.imshow(self.curr_img[0,:,:], extent=[0, 32, 32, 0], vmin=0, vmax=1)
 		for i, t in enumerate(self.targets):
 			
@@ -209,10 +211,16 @@ class ImgEnv(object):
 
 		plt.axis('off')	
 		if show_value_image:
-			axarr4 = plt.subplot(414)
+			axarr4 = plt.subplot(514)
 			mappable = axarr4.imshow(value_image)#, vmin=0, vmax=1)
 			plt.colorbar(mappable)#im, cax=cax, orientation='horizontal')
 			label(axarr4, (self.curr_pos[1], self.curr_pos[0]), 'A')
+			# axarr3.imshow(self.state[0, :, :], extent=[0, 32, 32, 0], vmin=0, vmax=1, alpha=0.4)
+			plt.axis('off')
+			axarr5 = plt.subplot(515)
+			mappable = axarr5.imshow(value_image_target)#, vmin=0, vmax=1)
+			plt.colorbar(mappable)#im, cax=cax, orientation='horizontal')
+			label(axarr5, (self.curr_pos[1], self.curr_pos[0]), 'A')
 			# axarr3.imshow(self.state[0, :, :], extent=[0, 32, 32, 0], vmin=0, vmax=1, alpha=0.4)
 			plt.axis('off')	
 		if save: plt.savefig(os.path.join(temp_dir, 'frame%i'%step_i), bbox_inches='tight')	
