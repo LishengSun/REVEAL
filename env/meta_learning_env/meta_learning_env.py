@@ -21,7 +21,7 @@ class metalEnv(object):
         self.time_matrix = time_matrix.iloc[:, 1:] # keep only real data
 
         # meta features
-        self.use_metafeatures = use_meta_features
+        self.use_meta_features = use_meta_features
         if use_meta_features:
             metafeatures_matrix.iloc[:, 1:] = (metafeatures_matrix.iloc[:, 1:] -
                                         metafeatures_matrix.iloc[:, 1:].mean()) / metafeatures_matrix.iloc[:, 1:].std()
@@ -50,7 +50,7 @@ class metalEnv(object):
                 line = random.randint(int(0.7*self.loss_matrix.shape[0])+1, self.loss_matrix.shape[0]-1)
         noise = self.noise
         segment = self.loss_matrix.loc[line]
-        if self.use_metafeatures:
+        if self.use_meta_features:
             segment = np.concatenate((segment, self.metafeatures_matrix.loc[line]))
         return line, segment + noise * np.random.random(self.segment_length)
 
@@ -66,7 +66,7 @@ class metalEnv(object):
 
         self.state = np.zeros((2, self.segment_length))
 
-        if self.use_metafeatures:
+        if self.use_meta_features:
             self.state[1, -self.nb_metafeatures:] = self.metafeatures_matrix.loc[self.line_number]
             self.state[0, -self.nb_metafeatures:] = np.ones(self.nb_metafeatures)
         return self.state

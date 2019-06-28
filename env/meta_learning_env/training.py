@@ -7,7 +7,7 @@ use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def train(agent, env, epochs, epsilons=None, postfix='', draw=False, next_after_e=True, save_result=True,
-          path_result="/content/drive/My Drive/oboe_RL/"):
+          path_result=""):
     """
     Training function for the RL agent
     :param agent: (agent class) the RL agent. Careful : the agent should load a model (agent.load_model(*args)) before training it.
@@ -79,13 +79,22 @@ def train(agent, env, epochs, epsilons=None, postfix='', draw=False, next_after_
 
 
     if save_result:
-        with open(path_result + "rewards_{}.pickle".format(postfix), 'wb') as handle:
+        with open(path_result + "rewards_withMF{}_TC{}_epoch{}_{}.pickle".format(env.use_meta_features,
+                                                                                 env.time_cost,
+                                                                                 epochs[-1],
+                                                                                 postfix), 'wb') as handle:
             pickle.dump(reward_list, handle)
 
-        with open(path_result + "losses_{}.pickle".format(postfix), 'wb') as handle:
+        with open(path_result + "losses_withMF{}_TC{}_epoch{}_{}.pickle".format(env.use_meta_features,
+                                                                                 env.time_cost,
+                                                                                 epochs[-1],
+                                                                                 postfix), 'wb') as handle:
             pickle.dump(loss_list, handle)
 
-        agent.save_model(path_result + 'model_{}.pickle'.format(postfix))
+        agent.save_model(path_result + 'model_withMF{}_TC{}_epoch{}_{}.pickle'.format(env.use_meta_features,
+                                                                                 env.time_cost,
+                                                                                 epochs[-1],
+                                                                                 postfix))
 
 
 def test(agent, env, epoch, postfix='', draw=False, path_result='/content/', save_result=True,
