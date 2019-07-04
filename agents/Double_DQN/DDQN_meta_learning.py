@@ -122,20 +122,19 @@ class DDQN_metal(Agent_metal):
 
     def save_model(self, model_path='model.pickle'):
         try:
-            torch.save(self.model, model_path)
+            # torch.save(self.model, model_path)
+            torch.save(self.model.state_dict(), model_path)
         except:
             pass
 
     def load_model(self, model=value_network_full_segment, model_path=None):
-        if model_path is None:
-            # self.model = big_navigation_model()
-            # self.target_model = big_navigation_model()
-            self.model = model(state_length=self.state_length, action_length=self.action_length)
-            self.target_model = model(state_length=self.state_length, action_length=self.action_length)
-            hard_update(self.target_model, self.model)
-        else:
-            self.model = torch.load(model_path)
-            self.target_model = torch.load(model_path)
+        self.model = model(state_length=self.state_length, action_length=self.action_length)
+        self.target_model = model(state_length=self.state_length, action_length=self.action_length)
+        if model_path is not None:
+            self.model.load_state_dict(torch.load(model_path))
+
+        hard_update(self.target_model, self.model)
+
         if torch.cuda.is_available():
             print('Using GPU')
             self.model.cuda()

@@ -91,7 +91,7 @@ def train(agent, env, epochs, epsilons=None, postfix='', draw=False, next_after_
                                                                                  postfix), 'wb') as handle:
             pickle.dump(loss_list, handle)
 
-        agent.save_model(path_result + 'model_withMF{}_TC{}_epoch{}_{}.pickle'.format(env.use_meta_features,
+        agent.save_model(path_result + 'model_withMF{}_TC{}_epoch{}_{}.pth'.format(env.use_meta_features,
                                                                                  env.time_cost,
                                                                                  epochs[-1],
                                                                                  postfix))
