@@ -54,13 +54,13 @@ class metalEnv(object):
             segment = np.concatenate((segment, self.metafeatures_matrix.loc[line]))
         return line, segment + noise * np.random.random(self.segment_length)
 
-    def reset(self, NEXT=True):
+    def reset(self, NEXT=True, line=None):
         self.pos = None
         self.num_steps = 0
         self.total_time = 0
         self.action_history = []
         if NEXT:
-            number, line = self.generate_a_segment()
+            number, line = self.generate_a_segment(line)
             self.line_number = number
             self.current_line = line
 

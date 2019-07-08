@@ -155,7 +155,7 @@ def test(agent, env, epoch, postfix='', draw=False, path_result='/content/', sav
         score += tot_reward
         reward_list.append(tot_reward)
         action_histories.append(env.action_history)
-        lines_list.append(env.line)
+        lines_list.append(env.line_number)
 
         if e % 50 == 0:
             print("Epoch {:03d}/{:03d} | reward {}".format(e, epoch, tot_reward))
@@ -165,6 +165,59 @@ def test(agent, env, epoch, postfix='', draw=False, path_result='/content/', sav
             pickle.dump(reward_list, handle)
     return lines_list, action_histories
 
+def test_one_line(agent, env, line, postfix='', draw=False, path_result='/content/', save_result=True,
+         rep_allowed=False):
+    """
+    :param agent: (agent class) the RL agent.
+    :param env: (metalEnv class) the environment.
+    :param epoch: (int) number of epochs.
+    :param postfix: (string)
+    :param draw: (bool)
+    :param path_result: (string)
+    :param save_result: (bool)
+    :param rep_allowed: (bool) if the agent should try a new model at each iteration.
+    :return: (list of int) history of lines, (list of list of int) history of trajectories
+    """
+    # Number of won games
+    action_histories = []
+    reward_list = []
+    score = 0
+
+    state = env.reset(NEXT=True, line=line)
+    state = torch.tensor(state, device=device, dtype=torch.float).unsqueeze(0)
+    # This assumes that the games will terminate
+    game_over = False
+
+    tot_reward = 0
+
+    while not game_over:
+        # The agent performs an action
+        if rep_allowed:
+            action = agent.act(state, train=False).item()
+        else:
+            with torch.no_grad():
+                Q_values = agent.model(state)[0].cpu().numpy()
+                best_models = np.argsort(Q_values)
+                best_models_no_rep = [model for model in best_models if model not in env.action_history]
+                action = best_models_no_rep[-1]
 
 
+        # Apply an action to the environment, get the next state, the reward
+        # and if the games end
+        prev_state = state
+        state, reward, game_over = env.step(action)
+
+        # update metrics
+        tot_reward += reward
+
+        state = torch.tensor(state, device=device, dtype=torch.float).unsqueeze(0)
+
+        # Save action
+        if draw:
+            env.draw(postfix)
+
+    if save_result:
+        with open(path_result + "rewards_test_{}_line_{}.pickle".format(postfix, line), 'wb') as handle:
+            pickle.dump(reward_list, handle)
+    return tot_reward, env.action_history
 
