@@ -6,12 +6,12 @@ import pandas as pd
 import seaborn as sns
 import os
 
-class metalEnv(object):
-    def __init__(self, loss_matrix=pd.read_csv(os.path.abspath(os.path.join(os.path.dirname(__file__), "meta_learning_matrices/error_BER_withoutNa.csv"))),
-                 time_matrix=pd.read_csv(os.path.abspath(os.path.join(os.path.dirname(__file__), "meta_learning_matrices/Time_withoutNa.csv"))),
-                 metafeatures_matrix=pd.read_csv(os.path.abspath(os.path.join(os.path.dirname(__file__), "meta_learning_matrices/Meta_features_withoutNa.csv"))),
-                 compression=None, noise=0.0, time_cost=0.1, max_steps=20, use_meta_features=False, train=True):
 
+class metalEnv(object):
+    def __init__(self, loss_matrix=pd.read_csv(os.path.join(os.getcwd(), "meta_learning_matrices/error_BER_withoutNa.csv")),
+                 time_matrix=pd.read_csv(os.path.join(os.getcwd(), "meta_learning_matrices/Time_withoutNa.csv")),
+                 metafeatures_matrix=pd.read_csv(os.path.join(os.getcwd(), "meta_learning_matrices/Meta_features_withoutNa.csv")),
+                 compression=None, noise=0.0, time_cost=0.1, max_steps=20, use_meta_features=False, train=True):
         self.compression = compression
         self.noise = noise
 
@@ -72,38 +72,6 @@ class metalEnv(object):
             self.state[0, -self.nb_metafeatures:] = np.ones(self.nb_metafeatures)
         return self.state
 
-    def _generate_a_test_segment(self, test_line_number):
-        if self.train:
-            line = random.randint(0, int(0.7*self.loss_matrix.shape[0]))
-        else:
-            line = range(int(0.7*self.loss_matrix.shape[0])+1, self.loss_matrix.shape[0]-1)[test_line_number]
-        noise = self.noise
-        segment = self.loss_matrix.loc[line]
-        if self.use_metafeatures:
-            segment = np.concatenate((segment, self.metafeatures_matrix.loc[line]))
-        return line, segment + noise * np.random.random(self.segment_length)
-
-
-    def _reset_test(self, test_line_number=0, NEXT=True):
-        """ 
-        always emit the same test instance for testing different agents
-        """
-        self.pos = None
-        self.num_steps = 0
-        self.total_time = 0
-        self.action_history = []
-        if NEXT:
-            number, line = self._generate_a_test_segment(test_line_number)
-            self.line_number = number
-
-        self.state = np.zeros((2, self.segment_length))
-
-        if self.use_metafeatures:
-            self.state[1, -self.nb_metafeatures:] = self.metafeatures_matrix.loc[self.line_number]
-            self.state[0, -self.nb_metafeatures:] = np.ones(self.nb_metafeatures)
-        return self.state
-
-
     def step(self, action):
         """
         Compute 1 step of the game.
@@ -149,7 +117,7 @@ class metalEnv(object):
         algo = self.loss_matrix.columns[chosen_index]
         return error, time, algo
 
-    def plot_time_perf(self, save_to):
+    def plot_time_perf(self):
         """
         At the end of the trajectory, plots the performance-time graph.
         """
@@ -186,8 +154,6 @@ class metalEnv(object):
         plt.xlabel("Time (s)")
         plt.ylabel("BER")
         plt.legend()
-        plt.savefig(save_to)
-        plt.close()
         plt.show()
 
 
