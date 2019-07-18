@@ -1,12 +1,13 @@
 import numpy as np
 import pickle
 import torch
+import torch.nn.functional as F
 
 use_cuda = torch.cuda.is_available()
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def train(agent, env, epochs, epsilons, postfix='', draw=False, next_after_e=True, save_result=True,
-          path_result="/content/drive/My Drive/oboe_RL/"):
+def train(agent, env, epochs, epsilons=None, postfix='', draw=False, next_after_e=True, save_result=True,
+          path_result=""):
     """
     Training function for the RL agent
     :param agent: (agent class) the RL agent. Careful : the agent should load a model (agent.load_model(*args)) before training it.
@@ -78,13 +79,22 @@ def train(agent, env, epochs, epsilons, postfix='', draw=False, next_after_e=Tru
 
 
     if save_result:
-        with open(path_result + "rewards_{}.pickle".format(postfix), 'wb') as handle:
+        with open(path_result + "rewards_withMF{}_TC{}_epoch{}_{}.pickle".format(env.use_meta_features,
+                                                                                 env.time_cost,
+                                                                                 epochs[-1],
+                                                                                 postfix), 'wb') as handle:
             pickle.dump(reward_list, handle)
 
-        with open(path_result + "losses_{}.pickle".format(postfix), 'wb') as handle:
+        with open(path_result + "losses_withMF{}_TC{}_epoch{}_{}.pickle".format(env.use_meta_features,
+                                                                                 env.time_cost,
+                                                                                 epochs[-1],
+                                                                                 postfix), 'wb') as handle:
             pickle.dump(loss_list, handle)
 
-        agent.save_model(path_result + 'model_{}.pickle'.format(postfix))
+        agent.save_model(path_result + 'model_withMF{}_TC{}_epoch{}_{}.pth'.format(env.use_meta_features,
+                                                                                 env.time_cost,
+                                                                                 epochs[-1],
+                                                                                 postfix))
 
 
 def test(agent, env, epoch, postfix='', draw=False, path_result='/content/', save_result=True,
@@ -145,7 +155,7 @@ def test(agent, env, epoch, postfix='', draw=False, path_result='/content/', sav
         score += tot_reward
         reward_list.append(tot_reward)
         action_histories.append(env.action_history)
-        lines_list.append(env.line)
+        lines_list.append(env.line_number)
 
         if e % 50 == 0:
             print("Epoch {:03d}/{:03d} | reward {}".format(e, epoch, tot_reward))
@@ -154,3 +164,60 @@ def test(agent, env, epoch, postfix='', draw=False, path_result='/content/', sav
         with open(path_result + "rewards_test_{}.pickle".format(postfix), 'wb') as handle:
             pickle.dump(reward_list, handle)
     return lines_list, action_histories
+
+def test_one_line(agent, env, line, postfix='', draw=False, path_result='/content/', save_result=True,
+         rep_allowed=False):
+    """
+    :param agent: (agent class) the RL agent.
+    :param env: (metalEnv class) the environment.
+    :param epoch: (int) number of epochs.
+    :param postfix: (string)
+    :param draw: (bool)
+    :param path_result: (string)
+    :param save_result: (bool)
+    :param rep_allowed: (bool) if the agent should try a new model at each iteration.
+    :return: (list of int) history of lines, (list of list of int) history of trajectories
+    """
+    # Number of won games
+    action_histories = []
+    reward_list = []
+    score = 0
+
+    state = env.reset(NEXT=True, line=line)
+    state = torch.tensor(state, device=device, dtype=torch.float).unsqueeze(0)
+    # This assumes that the games will terminate
+    game_over = False
+
+    tot_reward = 0
+
+    while not game_over:
+        # The agent performs an action
+        if rep_allowed:
+            action = agent.act(state, train=False).item()
+        else:
+            with torch.no_grad():
+                Q_values = agent.model(state)[0].cpu().numpy()
+                best_models = np.argsort(Q_values)
+                best_models_no_rep = [model for model in best_models if model not in env.action_history]
+                action = best_models_no_rep[-1]
+
+
+        # Apply an action to the environment, get the next state, the reward
+        # and if the games end
+        prev_state = state
+        state, reward, game_over = env.step(action)
+
+        # update metrics
+        tot_reward += reward
+
+        state = torch.tensor(state, device=device, dtype=torch.float).unsqueeze(0)
+
+        # Save action
+        if draw:
+            env.draw(postfix)
+
+    if save_result:
+        with open(path_result + "rewards_test_{}_line_{}.pickle".format(postfix, line), 'wb') as handle:
+            pickle.dump(reward_list, handle)
+    return tot_reward, env.action_history
+

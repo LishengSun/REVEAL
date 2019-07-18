@@ -22,7 +22,7 @@ class metalEnv(object):
         self.time_matrix = time_matrix.iloc[:, 1:] # keep only real data
 
         # meta features
-        self.use_metafeatures = use_meta_features
+        self.use_meta_features = use_meta_features
         if use_meta_features:
             metafeatures_matrix.iloc[:, 1:] = (metafeatures_matrix.iloc[:, 1:] -
                                         metafeatures_matrix.iloc[:, 1:].mean()) / metafeatures_matrix.iloc[:, 1:].std()
@@ -43,29 +43,31 @@ class metalEnv(object):
     def seed(self, seed):
         np.random.seed(seed)
 
-    def generate_a_segment(self):
-        if self.train:
-            line = random.randint(0, int(0.7*self.loss_matrix.shape[0]))
-        else:
-            line = random.randint(int(0.7*self.loss_matrix.shape[0])+1, self.loss_matrix.shape[0]-1)
+    def generate_a_segment(self, line=None):
+        if line is None:
+            if self.train:
+                line = random.randint(0, int(0.7*self.loss_matrix.shape[0]))
+            else:
+                line = random.randint(int(0.7*self.loss_matrix.shape[0])+1, self.loss_matrix.shape[0]-1)
         noise = self.noise
         segment = self.loss_matrix.loc[line]
-        if self.use_metafeatures:
+        if self.use_meta_features:
             segment = np.concatenate((segment, self.metafeatures_matrix.loc[line]))
         return line, segment + noise * np.random.random(self.segment_length)
 
-    def reset(self, NEXT=True):
+    def reset(self, NEXT=True, line=None):
         self.pos = None
         self.num_steps = 0
         self.total_time = 0
         self.action_history = []
         if NEXT:
-            number, line = self.generate_a_segment()
+            number, line = self.generate_a_segment(line)
             self.line_number = number
+            self.current_line = line
 
         self.state = np.zeros((2, self.segment_length))
 
-        if self.use_metafeatures:
+        if self.use_meta_features:
             self.state[1, -self.nb_metafeatures:] = self.metafeatures_matrix.loc[self.line_number]
             self.state[0, -self.nb_metafeatures:] = np.ones(self.nb_metafeatures)
         return self.state
@@ -113,10 +115,10 @@ class metalEnv(object):
                 self.line_number, action]
         else:
             reward = -self.time_cost * self.time_matrix.iloc[self.line_number, action] + max(0, np.min(
-                self.state[1][self.state[0] == 1] - self.loss_matrix.iloc[self.line_number, action]))
+                self.loss_matrix.iloc[self.line_number, self.action_history]) - self.loss_matrix.iloc[self.line_number, action])
         self.pos = action
 
-        self.state[1, self.pos] = self.loss_matrix.iloc[self.line_number, self.pos] + self.noise*np.random.normal()
+        self.state[1, self.pos] = self.current_line[self.pos]
         self.state[0, self.pos] = 1.
 
         self.action_history.append(action)
@@ -194,7 +196,7 @@ class metalEnv(object):
     def get_frame(self, t):
         segment_plot = np.zeros((1, self.segment_length, 3)).astype(int)
         segment_plot[:, self.state[0] == 0, :] = segment_plot[:, self.state[0] == 0, :] + 128
-        segment_plot[:, self.state[0] == 1, 0] = (self.loss_matrix.iloc[self.line_number, self.state[0] == 1] * 255).astype(
+        segment_plot[:, self.state[0] == 1, 0] = (self.current_line[self.state[0] == 1] * 255).astype(
             int)
         if self.pos is not None:
             segment_plot[:, self.pos, :] = np.clip(segment_plot[:, self.pos, :] + 170, 0, 255)
@@ -203,7 +205,7 @@ class metalEnv(object):
 
     def draw(self, e):
         true_image = np.zeros((1, self.segment_length, 3)).astype(int)
-        true_image[:, :, 0] = (self.loss_matrix.iloc[self.line_number, :] * 255).astype(int)
+        true_image[:, :, 0] = (self.current_line * 255).astype(int)
 
         array_list = [
             np.vstack([s_plot, true_image]) for s_plot in self.to_draw[:self.num_steps]

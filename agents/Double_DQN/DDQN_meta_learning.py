@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 
-from agent_abstract import Agent
+from agent_abstract import Agent_metal
 from replay_memory import ReplayMemory, Transition
 
 use_cuda = torch.cuda.is_available()
@@ -40,10 +40,10 @@ def hard_update(target, source):
       target_param.data.copy_(param.data)
 
 
-class DDQN_separated_net(Agent):
-    def __init__(self, segment_length=220, epsilon=0.3, memory_size=300, batch_size=16, target_update_interval=1,
+class DDQN_metal(Agent_metal):
+    def __init__(self, state_length=220, action_length=220,  epsilon=0.3, memory_size=300, batch_size=16, target_update_interval=1,
                  tau=0.005):
-        super(DDQN_separated_net, self).__init__(epsilon=epsilon, segment_length=segment_length)
+        super(DDQN_metal, self).__init__(epsilon=epsilon, action_length=action_length)
 
         # Memory
         self.memory = ReplayMemory(memory_size)
@@ -56,6 +56,8 @@ class DDQN_separated_net(Agent):
 
         #
         self.tau = tau
+
+        self.state_length = state_length
 
     def learned_act(self, s, with_grad=False, target=False):
         if with_grad:
@@ -110,7 +112,7 @@ class DDQN_separated_net(Agent):
         loss.backward()
         for param in self.model.parameters():
             # HINT: Clip the target to avoid exploiding gradients.. -- clipping is a bit tighter
-            param.grad.data.clamp_(-1e-6, 1e-6)
+            param.grad.data.clamp_(-1e-5, 1e-5)
         self.optimizer.step()
 
         if env_steps_ % self.target_update_interval == 0:
@@ -120,20 +122,19 @@ class DDQN_separated_net(Agent):
 
     def save_model(self, model_path='model.pickle'):
         try:
-            torch.save(self.model, model_path)
+            # torch.save(self.model, model_path)
+            torch.save(self.model.state_dict(), model_path)
         except:
             pass
 
-    def load_model(self, model=value_network_full_segment, action_length=160, model_path='model.pickle', local=True):
-        if local:
-            # self.model = big_navigation_model()
-            # self.target_model = big_navigation_model()
-            self.model = model(state_length=self.segment_length, action_length=action_length)
-            self.target_model = model(segment_length=self.segment_length)
-            hard_update(self.target_model, self.model)
-        else:
-            self.model = torch.load(model_path)
-            self.target_model = torch.load(model_path)
+    def load_model(self, model=value_network_full_segment, model_path=None):
+        self.model = model(state_length=self.state_length, action_length=self.action_length)
+        self.target_model = model(state_length=self.state_length, action_length=self.action_length)
+        if model_path is not None:
+            self.model.load_state_dict(torch.load(model_path))
+
+        hard_update(self.target_model, self.model)
+
         if torch.cuda.is_available():
             print('Using GPU')
             self.model.cuda()
