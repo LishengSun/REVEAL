@@ -1,6 +1,8 @@
 import numpy as np
 from meta_learning_env import metalEnv
 import random
+import seaborn as sns
+
 
 import matplotlib
 matplotlib.use('TkAgg')
@@ -114,43 +116,65 @@ class metalEnv_2D(metalEnv):
 		# plt.imshow(segments_plot)
 		# plt.show()
 
-	def draw(self, e):
-		true_image = np.zeros((self.nb_datasets, self.segment_length, 3)).astype(int)
-		true_image[:, :, 0] = (self.current_lines * 255).astype(int)
+	
 
-		array_list = [
-			np.vstack([s_plot, true_image]) for s_plot in self.to_draw[:self.num_steps]
-			]
-		image_list = []
-		for a in array_list:
-			fig = plt.figure()
-			plt.yticks([])
-			plt.imshow(a)
-			plt.hlines(0.5, -0.5, self.segment_length - 0.5)
-			fig.canvas.draw()
-			image = np.frombuffer(fig.canvas.tostring_rgb(), dtype='uint8')
-			image = image.reshape(fig.canvas.get_width_height()[::-1] + (3,))
-			plt.close(fig)
-			image_list.append(image)
-		imageio.mimsave('./{}.gif'.format(e), image_list, fps=1)
+	def plot_time_perf(self, lines=None):
+		"""
+		At the end of the trajectory, plots the performance-time graph.
+		"""
+		colors = ['r', 'y', 'g', 'b', 'magenta']
+		if lines == None:
+			lines = range(self.nb_datasets)
+		for line_index in lines:
+			line = self.line_numbers[line_index]
+			ah_index = [self.action_history[i][1] for i in range(len(self.action_history)) if self.action_history[i][0]==line_index]
+			
+			error = self.loss_matrix.iloc[line, ah_index]
+			time = self.time_matrix.iloc[line, ah_index]
+			algo = self.loss_matrix.columns[ah_index]
+
+			def _minimums_index(error, time):
+				return [0] + [i for i in range(1, len(time)) if error[i] < np.min(error[:i])]
+
+			optimal = np.min(self.loss_matrix.loc[line])
+			cumtime = np.cumsum(time)
+			min_ind = _minimums_index(error, time)
+			cum_error = np.minimum.accumulate(error)
+
+			error_random, time_random, algo_random = self._better_than_random_baseline(line)
+			cumtime_random = np.cumsum(time_random)[np.cumsum(time_random) < np.max(cumtime)]
+			cum_error_random = np.minimum.accumulate(error_random)[np.cumsum(time_random) < np.max(cumtime)]
+
+			# sns.lineplot(cumtime, cum_error, label='agent', color=colors[line_index])
+			# sns.lineplot(cumtime_random, cum_error_random, label='greedy baseline', color=colors[line_index])
+			plt.plot(cumtime, cum_error, '*:', label='T%i:agent'%line_index, color=colors[line_index])
+			plt.plot(cumtime_random, cum_error_random, '.:', label='T%i:greedy baseline'%line_index, color=colors[line_index])
+			plt.vlines(cumtime[min_ind], 0, max(max(cum_error), max(cum_error_random)), linestyles='dashed')
+			plt.hlines(optimal, min(cumtime), max(cumtime), label='T%i:optimal'%line_index, color=colors[line_index])
+			for i in min_ind:
+				plt.text(cumtime[i], max(max(cum_error), max(cum_error_random)) / 1.2, algo[i][15:].split(" ")[0][:-2],
+						 rotation=90, color='k')
+		plt.ylim([optimal-0.1, np.max(cum_error.append(cum_error_random))+0.1])
+		plt.xlabel("Time (s)")
+		plt.ylabel("BER")
+		plt.legend()
+		plt.show()
+
 
 
 
 
 if __name__ == '__main__':
-	env = metalEnv_2D(use_meta_features=False)
+	env = metalEnv_2D(use_meta_features=False, max_steps=100)
 	env.reset()
-	for t in range(10):
+	for t in range(50):
 		print ('t = ', t)
 		l = random.randint(0, env.nb_datasets-1)
 		c = random.randint(0, env.loss_matrix.shape[1]-1)
 		action = [l, c]
 		state, reward, done = env.step(action)
-		print ()
-		print ()
-	# lines, segments = env.generate_n_segments()
-
-	env.draw('XXX')
+		
+	env.plot_time_perf([0])
 
 
 
