@@ -121,7 +121,7 @@ class ImgEnv(object):
 
 		self.num_steps = 0
 		
-		return self.state
+		return np.array(self.state)
 
 
 	def step(self, action):
@@ -161,7 +161,7 @@ class ImgEnv(object):
 
 		if done:
 			reward = 1
-		return self.state, reward, done, {}
+		return np.array(self.state), reward, done, {}
 
 
 	def render(self):
