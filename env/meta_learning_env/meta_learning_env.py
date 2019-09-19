@@ -39,15 +39,30 @@ class metalEnv(object):
         self.to_draw = np.zeros((self.max_steps + 1, 1, self.segment_length, 3)).astype(int)
         self.train = train
 
+
+        if self.train:
+            self.loss_matrix = self.loss_matrix.iloc[:int(0.7 * self.loss_matrix.shape[0]), :]
+            self.time_matrix = self.time_matrix.iloc[:int(0.7 * self.time_matrix.shape[0]), :]
+            if use_meta_features:
+                self.metafeatures_matrix = self.metafeatures_matrix.iloc[:int(0.7 * self.metafeatures_matrix.shape[0]), :]
+        else:
+            self.loss_matrix = self.loss_matrix.iloc[int(0.7 * self.loss_matrix.shape[0]):, :]
+            self.time_matrix = self.time_matrix.iloc[int(0.7 * self.time_matrix.shape[0]):, :]
+            if use_meta_features:
+                self.metafeatures_matrix = self.metafeatures_matrix.iloc[int(0.7 * self.metafeatures_matrix.shape[0]):, :]
+
+        # self.loss_matrix.reset_index(drop=True, inplace=True)
+        # self.time_matrix.reset_index(drop=True, inplace=True)
+        # if use_meta_features:
+        #    self.metafeatures_matrix.reset_index(drop=True, inplace=True)
+
     def seed(self, seed):
         np.random.seed(seed)
 
     def generate_a_segment(self, line=None):
         if line is None:
-            if self.train:
-                line = random.randint(0, int(0.7*self.loss_matrix.shape[0]))
-            else:
-                line = random.randint(int(0.7*self.loss_matrix.shape[0])+1, self.loss_matrix.shape[0]-1)
+            line = random.randint(self.loss_matrix.index[0], self.loss_matrix.index[-1]-1)
+
         noise = self.noise
         segment = self.loss_matrix.loc[line]
         if self.use_meta_features:
@@ -78,11 +93,11 @@ class metalEnv(object):
         :return: array new_state, float reward, bool done
         """
         if self.pos is None:
-            reward = -self.time_cost * self.time_matrix.iloc[self.line_number, action] + 1 - self.loss_matrix.iloc[
-                self.line_number, action]
+            reward = -self.time_cost * self.time_matrix.loc[self.line_number][action] + 1 - self.loss_matrix.loc[
+                self.line_number][action]
         else:
-            reward = -self.time_cost * self.time_matrix.iloc[self.line_number, action] + max(0, np.min(
-                self.loss_matrix.iloc[self.line_number, self.action_history]) - self.loss_matrix.iloc[self.line_number, action])
+            reward = -self.time_cost * self.time_matrix.loc[self.line_number][action] + max(0, np.min(
+                self.loss_matrix.loc[self.line_number][self.action_history]) - self.loss_matrix.loc[self.line_number][action])
         self.pos = action
 
         self.state[1, self.pos] = self.current_line[self.pos]
@@ -116,14 +131,22 @@ class metalEnv(object):
         algo = self.loss_matrix.columns[chosen_index]
         return error, time, algo
 
-    def plot_time_perf(self):
+    def plot_time_perf(self, line=None, action_history=None):
+
         """
         At the end of the trajectory, plots the performance-time graph.
+
+        :param line: line number for a specific dataset
+        :param action_history: (list of int)
+        :return:
         """
-        line = self.line_number
-        error = self.loss_matrix.iloc[line, self.action_history]
-        time = self.time_matrix.iloc[line, self.action_history]
-        algo = self.loss_matrix.columns[self.action_history]
+        if not line:
+            line = self.line_number
+        if not action_history:
+            action_history = self.action_history
+        algo = self.loss_matrix.columns[action_history]
+        error = self.loss_matrix.iloc[line, action_history]
+        time = self.time_matrix.iloc[line, action_history]
 
         def _minimums_index(error, time):
             return [0] + [i for i in range(1, len(time)) if error[i] < np.min(error[:i])]
@@ -155,6 +178,21 @@ class metalEnv(object):
         plt.legend()
         plt.show()
 
+    def plot_time_perf_mean(self, lines, action_histories):
+
+        def _minimums_index(error, time):
+            return [0] + [i for i in range(1, len(time)) if error[i] < np.min(error[:i])]
+
+        time_total = []
+        line_total = []
+        for (line, action_history) in zip(lines, action_histories):
+            time = self.time_matrix.iloc[line, action_history]
+            time_total = time_total + time
+            line_total = line_total + [line]*len(time)
+        ind_sort = np.argsort(time_total)
+        line_total = np.array(line_total)[ind_sort]
+        time_total = np.array(time_total)[ind_sort]
+        cum_error_total
 
     # the following functions have to do with plotting the trajectory as lighting pixels in the segment
     # (as in the segment game)
@@ -187,3 +225,4 @@ class metalEnv(object):
             plt.close(fig)
             image_list.append(image)
         imageio.mimsave('./{}.gif'.format(e), image_list, fps=1)
+
