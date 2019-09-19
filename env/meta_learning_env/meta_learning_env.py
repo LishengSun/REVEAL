@@ -4,12 +4,13 @@ import matplotlib.pyplot as plt
 import imageio
 import pandas as pd
 import seaborn as sns
+import os
 
 
 class metalEnv(object):
-    def __init__(self, loss_matrix=pd.read_csv("env/meta_learning_env/meta_learning_matrices/error_BER_withoutNa.csv"),
-                 time_matrix=pd.read_csv("env/meta_learning_env/meta_learning_matrices/Time_withoutNa.csv"),
-                 metafeatures_matrix=pd.read_csv("env/meta_learning_env/meta_learning_matrices/Meta_features_withoutNa.csv"),
+    def __init__(self, loss_matrix=pd.read_csv(os.path.join(os.getcwd(), "meta_learning_matrices/error_BER_withoutNa.csv")),
+                 time_matrix=pd.read_csv(os.path.join(os.getcwd(), "meta_learning_matrices/Time_withoutNa.csv")),
+                 metafeatures_matrix=pd.read_csv(os.path.join(os.getcwd(), "meta_learning_matrices/Meta_features_withoutNa.csv")),
                  compression=None, noise=0.0, time_cost=0.1, max_steps=20, use_meta_features=False, train=True):
         self.compression = compression
         self.noise = noise
