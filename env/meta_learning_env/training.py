@@ -220,4 +220,3 @@ def test_one_line(agent, env, line, postfix='', draw=False, path_result='/conten
         with open(path_result + "rewards_test_{}_line_{}.pickle".format(postfix, line), 'wb') as handle:
             pickle.dump(reward_list, handle)
     return tot_reward, env.action_history
-

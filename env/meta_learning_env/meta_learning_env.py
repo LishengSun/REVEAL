@@ -11,7 +11,7 @@ class metalEnv(object):
     def __init__(self, loss_matrix=pd.read_csv(os.path.join(os.getcwd(), "meta_learning_matrices/error_BER_withoutNa.csv")),
                  time_matrix=pd.read_csv(os.path.join(os.getcwd(), "meta_learning_matrices/Time_withoutNa.csv")),
                  metafeatures_matrix=pd.read_csv(os.path.join(os.getcwd(), "meta_learning_matrices/Meta_features_withoutNa.csv")),
-                 compression=None, noise=0.0, time_cost=0.1, max_steps=20, use_meta_features=False, train=True):
+                 compression=None, noise=0.0, time_cost=0.1, max_steps=20, use_meta_features=False, use_case=None):
         self.compression = compression
         self.noise = noise
 
@@ -38,19 +38,24 @@ class metalEnv(object):
 
         # these attributes are here to make plotting easier
         self.to_draw = np.zeros((self.max_steps + 1, 1, self.segment_length, 3)).astype(int)
-        self.train = train
+        self.use_case = use_case
 
 
-        if self.train:
+        if self.use_case == 'train':
             self.loss_matrix = self.loss_matrix.iloc[:int(0.7 * self.loss_matrix.shape[0]), :]
             self.time_matrix = self.time_matrix.iloc[:int(0.7 * self.time_matrix.shape[0]), :]
             if use_meta_features:
                 self.metafeatures_matrix = self.metafeatures_matrix.iloc[:int(0.7 * self.metafeatures_matrix.shape[0]), :]
-        else:
+        elif self.use_case == 'test':
             self.loss_matrix = self.loss_matrix.iloc[int(0.7 * self.loss_matrix.shape[0]):, :]
             self.time_matrix = self.time_matrix.iloc[int(0.7 * self.time_matrix.shape[0]):, :]
             if use_meta_features:
                 self.metafeatures_matrix = self.metafeatures_matrix.iloc[int(0.7 * self.metafeatures_matrix.shape[0]):, :]
+        else:
+            self.loss_matrix = self.loss_matrix
+            self.time_matrix = self.time_matrix
+            if use_meta_features:
+                self.metafeatures_matrix = self.metafeatures_matrix
 
         # self.loss_matrix.reset_index(drop=True, inplace=True)
         # self.time_matrix.reset_index(drop=True, inplace=True)
